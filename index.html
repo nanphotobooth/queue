@@ -62,6 +62,9 @@
   th{font-weight:500;color:var(--muted);font-size:13px}
   th:first-child,td:first-child{text-align:left}
   ul{margin:10px 0 0;padding-left:20px;color:var(--muted);font-size:14px}
+  .gfx{display:grid;gap:10px;margin:4px 0 14px}
+  .gfx a{display:block;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  .gfx img{display:block;width:100%;height:auto;aspect-ratio:1/1;background:var(--full-bg)}
   .loading{color:var(--muted);text-align:center;padding:26px 0}
   .err{background:#fde8e4;color:#8a2c1b;border-radius:12px;padding:12px;font-size:14px}
   footer{text-align:center;color:var(--muted);font-size:13px;margin-top:22px}
@@ -100,7 +103,8 @@
     <div id="prices"><div class="loading">กำลังโหลดราคา…</div></div>
   </section>
 
-  <footer id="foot"></footer>
+  <footer id="foot2" hidden><a href="status.html">ตรวจสถานะการจอง</a></footer>
+  <footer id="foot" style="margin-top:6px"></footer>
 </div>
 
 <script>
@@ -175,11 +179,13 @@
       left.appendChild(el('small',null,String(r[1]).replace('-','–')+' น.')); row.appendChild(left); row.appendChild(el('span','tag',LABEL[r[2]])); box.appendChild(row);
     });
     var anyFree=st.indexOf('A')>=0, anyPend=st.indexOf('P')>=0, soon=iso<addDays(init.today,init.leadDays);
-    var msg = anyFree ? (soon ? 'วันงานใกล้มาก กรุณาทักแชทเพื่อเช็กกับทีมงานก่อนนะคะ' : 'คิวยังว่าง ทักแชทเพจเพื่อจองคิวได้เลยค่ะ')
+    var msg = anyFree ? (soon ? 'วันงานใกล้มาก กรุณาทักแชทเพื่อเช็กกับทีมงานก่อนนะคะ' : (init.holdMinutes ? 'คิวยังว่าง จองออนไลน์และชำระมัดจำได้เลยค่ะ' : 'คิวยังว่าง ทักแชทเพจเพื่อจองคิวได้เลยค่ะ'))
             : anyPend ? 'มีลูกค้ารอยืนยันคิวอยู่ ทักแชทเพื่อเข้าคิวสำรองได้ค่ะ' : 'วันนี้คิวเต็มแล้ว ลองเลือกวันอื่น หรือทักแชทสอบถามได้ค่ะ';
     box.appendChild(el('p','note',msg));
     var btns=el('div','btns');
-    var a=el('a','btn primary',anyFree?'จองคิววันนี้ทางแชทเพจ':'สอบถามทางแชทเพจ'); a.href=init.shop.messenger; a.target='_blank'; a.rel='noopener'; btns.appendChild(a);
+    var online=!!init.holdMinutes;
+    if(online&&anyFree&&!soon){ var bk=el('a','btn primary','จองคิววันนี้ออนไลน์'); bk.href='book.html?date='+iso+(st[0]==='A'&&st[1]!=='A'?'&slot=เช้า':st[1]==='A'&&st[0]!=='A'?'&slot=เย็น':''); btns.appendChild(bk); }
+    var a=el('a',(online&&anyFree&&!soon)?'btn':'btn primary',(!online&&anyFree)?'จองคิววันนี้ทางแชทเพจ':'สอบถามทางแชทเพจ'); a.href=init.shop.messenger; a.target='_blank'; a.rel='noopener'; btns.appendChild(a);
     box.appendChild(btns);
     box.appendChild(el('p','note','โทร '+init.shop.phones));
     box.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -187,6 +193,10 @@
 
   function renderPrices(){
     var box=$('prices'); box.innerHTML='';
+    var gfx=el('div','gfx');
+    (tab==='pb' ? [['g-pb-detail.jpg','รายละเอียดบริการ Photo Booth'],['g-pb-price.jpg','ตารางราคา Photo Booth']] : [['g-vgb-detail.jpg','รายละเอียดบริการ Video Guestbook'],['g-vgb-price.jpg','ตารางราคา Video Guestbook']]).forEach(function(g){
+      var a=el('a'); a.href=g[0]; a.target='_blank'; a.rel='noopener'; var im=el('img'); im.src=g[0]; im.alt=g[1]; im.loading='lazy'; im.width=1080; im.height=1080; a.appendChild(im); gfx.appendChild(a); });
+    box.appendChild(gfx);
     var t=el('table'), h=el('tr');
     var heads = tab==='pb' ? ['ชั่วโมง','ไม่พิมพ์ภาพ','พิมพ์ 2x6 นิ้ว','พิมพ์ 4x6 นิ้ว'] : ['ชั่วโมง','Video Guestbook','คู่กับ Photo Booth 2x6'];
     heads.forEach(function(x){ h.appendChild(el('th',null,x)); }); t.appendChild(h);
@@ -210,7 +220,7 @@
 
   api('publicInit').then(function(r){
     init=r; cur={y:+r.today.slice(0,4),m:+r.today.slice(5,7)};
-    render(); renderPrices();
+    render(); renderPrices(); if(r.holdMinutes) $('foot2').hidden=false;
     var f=$('foot'); f.textContent='';
     [['Facebook',r.shop.facebook],['Instagram',r.shop.instagram]].forEach(function(l,i){ if(!l[1]) return; if(i) f.appendChild(document.createTextNode(' · ')); var a=el('a',null,l[0]); a.href=l[1]; a.target='_blank'; a.rel='noopener'; f.appendChild(a); });
   }).catch(function(e){
