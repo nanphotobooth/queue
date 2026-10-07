@@ -72,6 +72,11 @@
   .js label.check{display:flex;gap:10px;align-items:center;font-size:15px;margin:6px 0}
   .js label.check input{width:22px;min-height:22px;height:22px}
   @media print{ body>.wrap{display:none} dialog{position:static;height:auto;max-height:none} .noprint{display:none!important} }
+  .bar-row{display:grid;grid-template-columns:5.5em 1fr auto;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+  .bar-row i{display:block;height:14px;border-radius:4px;background:var(--ink);min-width:2px}
+  .bar-row b{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rk{width:100%;border-collapse:collapse;font-size:14px}
+  .rk td{padding:6px 0;border-bottom:1px solid var(--line)} .rk td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
   .slip{display:block;max-width:100%;max-height:70vh;margin:0 auto 10px;border-radius:10px;border:1px solid var(--line)}
   .ro{font-size:14px;margin:0}
   .ro dt{color:var(--muted);font-size:12px;margin-top:8px}
@@ -127,7 +132,9 @@
     var app=$('app'); if(!S.data){ app.innerHTML=''; app.appendChild(el('div',{class:'empty',text:'กำลังโหลดคิวงาน…'})); }
     return api('adminData',S.token).then(function(d){ S.data=d; main(keepMsg); }).catch(function(e){ var t=errText(e); if(/หมดเวลา/.test(t)){ store.set(null); loginView(t); } else { app.innerHTML=''; app.appendChild(el('div',{class:'msg bad',text:t})); app.appendChild(el('button',{class:'btn',text:'ลองใหม่',onclick:function(){ refresh(); }})); } });
   }
-  function missing(b){ var m=[]; if(!b.start||!b.end) m.push('เวลา'); if(!b.phone) m.push('เบอร์โทร'); if(b.service!=='Video Guestbook'&&!b.backdrop) m.push('ฉาก'); if(!b.venue) m.push('สถานที่'); return m; }
+  function missing(b){ var m=[]; if(!b.start||!b.end) m.push('เวลา'); if(!b.phone) m.push('เบอร์โทร'); if(b.service!=='Video Guestbook'&&!b.backdrop) m.push('ฉาก'); if(!b.venue) m.push('สถานที่');
+    if(b.service!=='Video Guestbook'&&(!b.designStatus||b.designStatus===S.lists.design[0])&&!b.cardFile&&!b.templateText) m.push('ข้อมูลออกแบบ'); return m; }
+  function todo(b){ var t=[]; if(!b.filesSent) t.push('ส่งไฟล์'); if(!b.reviewAsked) t.push('ขอรีวิว'); if(!b.posted) t.push('โพสต์ผลงาน'); return t; }
   var order=function(b){ return b.date+(b.slot==='เย็น'?'2':'1'); };
 
   /* ---------- main ---------- */
@@ -149,10 +156,11 @@
       el('div',{class:'stat'},[el('b',{text:up.length}),el('span',{text:'คิวล่วงหน้า'})]),
       el('div',{class:'stat'},[el('b',{text:review.length}),el('span',{text:'สลิปรอตรวจ'})]) ]));
     var tabs=el('div',{class:'tabs',style:'margin-top:12px'});
-    [['review','ตรวจสลิป'+(review.length?' ('+review.length+')':'')],['close','ปิดงาน/รับเงิน'+(close.length?' ('+close.length+')':'')],['up','คิวล่วงหน้า'],['need','ข้อมูลไม่ครบ'+(need.length?' ('+need.length+')':'')],['past','ที่ผ่านมา'],['ledger','บัญชี'],['block','ปิดวัน']].forEach(function(t){ tabs.appendChild(el('button',{class:S.tab===t[0]?'on':'',text:t[1],onclick:function(){ S.tab=t[0]; main(); }})); });
+    [['review','ตรวจสลิป'+(review.length?' ('+review.length+')':'')],['close','ปิดงาน/รับเงิน'+(close.length?' ('+close.length+')':'')],['up','คิวล่วงหน้า'],['need','ข้อมูลไม่ครบ'+(need.length?' ('+need.length+')':'')],['past','ที่ผ่านมา'],['ledger','บัญชี'],['report','รายงาน'],['block','ปิดวัน']].forEach(function(t){ tabs.appendChild(el('button',{class:S.tab===t[0]?'on':'',text:t[1],onclick:function(){ S.tab=t[0]; main(); }})); });
     app.appendChild(tabs);
     if(S.tab==='block'){ blocksView(app); }
     else if(S.tab==='ledger'){ ledgerView(app); }
+    else if(S.tab==='report'){ reportView(app); }
     else{
       var q=el('input',{class:'search',type:'search',placeholder:'ค้นหาชื่อลูกค้า สถานที่ หรือเลขที่การจอง',value:S.q,'aria-label':'ค้นหา'});
       q.oninput=function(){ S.q=q.value; list(); }; app.appendChild(q);
@@ -173,12 +181,13 @@
             el('div',{class:'cust',text:b.customer+(b.venue?' · '+b.venue:'')}),
             el('div',{class:'meta',text:[b.service+(b.hours?' '+b.hours+' ชม.':''), b.print&&b.print!=='-'?b.print:'', b.total!==undefined&&b.total!==''?fmt(b.total)+' บาท':'', b.payStatus||''].filter(String).join(' · ')}),
             miss.length?el('div',{class:'miss',text:'ยังขาด: '+miss.join(', ')}):null,
+            (S.tab==='past'&&(b.status==='ปิดงาน'||b.status==='เสร็จงาน'||b.status==='จบงาน รอชำระ')&&b.date>=addDays(today,-45)&&todo(b).length)?el('div',{class:'miss',text:'ยังไม่ได้: '+todo(b).join(', ')}):null,
             S.tab==='close'?el('div',{class:'miss',text:b.status==='ยืนยันคิว'?'ถึงวันงานแล้ว รอกดจบงาน':b.status==='รอตรวจยอดคงเหลือ'?'มีสลิปยอดคงเหลือรอตรวจ '+fmt(due(b))+' บาท':'ค้างรับ '+fmt(due(b))+' บาท'}):null ]));
         });
       };
       list();
     }
-    if(S.me.canEdit && S.tab!=='block' && S.tab!=='ledger') app.appendChild(el('button',{class:'fab',text:'+ เพิ่มคิว',onclick:function(){ form(null); }}));
+    if(S.me.canEdit && S.tab!=='block' && S.tab!=='ledger' && S.tab!=='report') app.appendChild(el('button',{class:'fab',text:'+ เพิ่มคิว',onclick:function(){ form(null); }}));
   }
 
   /* ---------- blocked dates ---------- */
@@ -275,6 +284,37 @@
     var fs=el('fieldset',{},[el('legend',{text:'เช็กลิสต์อุปกรณ์'})]); items.forEach(function(t){ fs.appendChild(el('label',{class:'check'},[el('input',{type:'checkbox'}),t])); }); sheet.appendChild(fs);
     if(!$('dlg').open) $('dlg').showModal(); $('dlg').scrollTop=0;
   }
+  function reportView(app){
+    var box=el('div',{style:'margin-top:12px'}); app.appendChild(box);
+    var MONS=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    var stat=function(v,t){ return el('div',{class:'stat'},[el('b',{text:v}),el('span',{text:t})]); };
+    var rank=function(title,rows,unit){ var t=el('table',{class:'rk'}); rows.forEach(function(r){ t.appendChild(el('tr',{},[el('td',{text:r[0]}),el('td',{text:fmt(r[1])+(unit||'')})])); }); if(!rows.length) t.appendChild(el('tr',{},[el('td',{text:'ยังไม่มีข้อมูล'}),el('td',{text:''})])); return el('fieldset',{style:'margin-top:12px'},[el('legend',{text:title}),t]); };
+    var bars=function(title,ms,key,unit){ var max=Math.max.apply(null,ms.map(function(m){ return m[key]; }).concat([1])); var fs=el('fieldset',{style:'margin-top:12px'},[el('legend',{text:title})]);
+      ms.forEach(function(m,i){ fs.appendChild(el('div',{class:'bar-row'},[el('span',{text:MONS[i]}),el('div',{},[el('i',{style:'width:'+Math.round(m[key]/max*100)+'%'})]),el('b',{text:fmt(m[key])+(unit||'')})])); }); return fs; };
+    var draw=function(r){
+      box.innerHTML=''; S.ry=r.year;
+      var ysel=el('select',{'aria-label':'ปี'}); r.years.forEach(function(y){ var o=el('option',{value:y,text:'ปี '+(+y+543)}); if(+y===r.year) o.selected=true; ysel.appendChild(o); }); ysel.onchange=function(){ load(ysel.value); };
+      box.appendChild(ysel);
+      box.appendChild(el('div',{class:'stats'},[ stat(fmt(r.total.jobs),'งานทั้งปี'), stat(fmt(r.total.value),'มูลค่างาน (บาท)'), stat(fmt(r.total.jobs?Math.round(r.total.value/r.total.jobs):0),'เฉลี่ยต่องาน') ]));
+      box.appendChild(el('div',{class:'stats'},[ stat(fmt(r.total.done),'จบแล้ว'), stat(fmt(r.total.upcoming),'คิวล่วงหน้า'), stat(fmt(r.owed.amount),'ค้างรับ '+r.owed.n+' งาน') ]));
+      box.appendChild(bars('จำนวนงานต่อเดือน (ตามวันงาน)',r.months,'jobs'));
+      box.appendChild(bars('มูลค่างานต่อเดือน (บาท)',r.months,'value'));
+      var led=el('table',{class:'rk'}); [['รายรับที่ลงบัญชี',r.ledger.inc],['รายจ่ายที่ลงบัญชี',r.ledger.exp],['คงเหลือ',r.ledger.inc-r.ledger.exp]].forEach(function(x){ led.appendChild(el('tr',{},[el('td',{text:x[0]}),el('td',{text:fmt(x[1])})])); });
+      box.appendChild(el('fieldset',{style:'margin-top:12px'},[el('legend',{text:'บัญชีรับจ่ายของปี'}),led,el('p',{style:'font-size:12px;color:var(--muted);margin:8px 0 0',text:'นับเฉพาะรายการที่ลงในระบบ ซึ่งเริ่มบันทึกตั้งแต่ 7 ต.ค. 2569'})]));
+      box.appendChild(rank('รายจ่ายตามหมวด (บาท)',r.ledger.cats));
+      box.appendChild(rank('ลูกค้ารู้จักร้านจากไหน (งาน)',r.source));
+      box.appendChild(rank('บริการ (งาน)',r.service));
+      box.appendChild(rank('จำนวนชั่วโมงที่จอง (งาน)',r.hours));
+      box.appendChild(rank('พื้นที่ (งาน)',r.area));
+      box.appendChild(rank('สถานที่ที่ไปบ่อย (งาน)',r.venue));
+      var w=r.web, wt=el('table',{class:'rk'}); [['กดจองออนไลน์',w.holds],['ยืนยันคิวสำเร็จ',w.confirmed],['รอชำระหรือรอตรวจ',w.waiting],['หมดเวลาโดยไม่ชำระ',w.expired],['ปฏิเสธหรือยกเลิก',w.rejected],['ขอใบเสนอราคา',w.quotes],['ใบเสนอราคาที่กลายเป็นการจอง',w.quotesBooked]].forEach(function(x){ wt.appendChild(el('tr',{},[el('td',{text:x[0]}),el('td',{text:fmt(x[1])})])); });
+      box.appendChild(el('fieldset',{style:'margin-top:12px'},[el('legend',{text:'การจองออนไลน์ของปีนี้'}),wt]));
+      var f=r.follow, ft=el('table',{class:'rk'}); [['งานที่จบแล้ว',f.base],['ส่งไฟล์ให้ลูกค้าแล้ว',f.files],['ขอรีวิวแล้ว',f.review],['โพสต์ผลงานแล้ว',f.posted]].forEach(function(x){ ft.appendChild(el('tr',{},[el('td',{text:x[0]}),el('td',{text:fmt(x[1])})])); });
+      box.appendChild(el('fieldset',{style:'margin-top:12px'},[el('legend',{text:'งานหลังจบ'}),ft]));
+    };
+    var load=function(y){ box.innerHTML=''; box.appendChild(el('div',{class:'empty',text:'กำลังทำรายงาน…'})); api('adminReport',S.token,y||S.ry||'').then(draw).catch(function(e){ box.innerHTML=''; box.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+    load();
+  }
   function ledgerView(app){
     var box=el('div',{style:'margin-top:12px'}); app.appendChild(box);
     var MON2=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -353,8 +393,10 @@
       lab('ราคาแพ็กเกจ',inp('price','number',{inputmode:'numeric',min:0})), lab('ค่าเดินทาง',inp('travel','number',{inputmode:'numeric',min:0})),
       lab('ค่าเพิ่มอื่น',inp('extra','number',{inputmode:'numeric',min:0})), lab('ยอดรวม',inp('total','number',{inputmode:'numeric',min:0})),
       lab('มัดจำ (แก้ได้)',inp('deposit','number',{inputmode:'numeric',min:0})), lab('สถานะเงิน',sel('payStatus',L.pay)) ]) ]));
+    var flag=function(k,text){ var c=el('input',{type:'checkbox'}); c.checked=!!b[k]; if(ro) c.disabled=true; F[k]={type:'flag',get value(){ return c.checked?'ใช่':''; }}; return el('label',{class:'check full'},[c,text]); };
     sheet.appendChild(el('fieldset',{},[ el('legend',{text:'สถานะและหมายเหตุ'}), el('div',{class:'f'},[
       lab('สถานะคิว',sel('status',L.status)), lab('ที่มา / ผู้ดีล',inp('source')), lab('หมายเหตุ',note,true) ]) ]));
+    if(!isNew) sheet.appendChild(el('fieldset',{},[ el('legend',{text:'ติดตามงาน'}), el('div',{class:'f'},[ lab('งานออกแบบเทมเพลต',sel('designStatus',L.design),true), flag('filesSent','ส่งไฟล์ให้ลูกค้าแล้ว'), flag('reviewAsked','ขอรีวิวจากลูกค้าแล้ว'), flag('posted','โพสต์ผลงานลงเพจแล้ว') ]) ]));
     sheet.appendChild(out);
     if(!ro){
       var save=el('button',{class:'btn primary',type:'button',text:'บันทึก'});
