@@ -120,6 +120,7 @@ var readFile=function(file,asImage){
 var STATUS_INFO={
   'ถือคิวชั่วคราว':['warn','รอชำระมัดจำ'],'รอตรวจมัดจำ':['warn','รอทีมงานตรวจสลิป'],'สลิปมีปัญหา':['bad','สลิปมีปัญหา กรุณาแนบใหม่'],
   'ยืนยันคิว':['ok','ยืนยันคิวแล้ว'],'รอยืนยัน':['warn','รอยืนยัน'],'เสร็จงาน':['off','เสร็จงานแล้ว'],'ยกเลิก':['bad','ยกเลิกแล้ว'],
+  'จบงาน รอชำระ':['warn','รอชำระยอดคงเหลือ'],'รอตรวจยอดคงเหลือ':['warn','รอทีมงานตรวจสลิป'],'ปิดงาน':['ok','ชำระครบแล้ว'],
   'หมดเวลา':['bad','หมดเวลาถือคิว'],'ปฏิเสธ':['bad','ไม่ได้รับการยืนยัน'],'ใบเสนอราคา':['off','ใบเสนอราคา (ยังไม่ได้จอง)']
 };
 var TERMS=[
@@ -159,21 +160,39 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
   var kv=function(rows){ var t=el('table',{class:'kv'}); rows.forEach(function(r){ if(r) t.appendChild(el('tr',r[2]?{class:r[2]}:{},[el('td',{text:r[0]}),el('td',{text:r[1]})])); }); return t; };
   var summary=function(b){ return kv([ ['วันงาน',thLong(b.date)], ['เวลา','รอบ'+b.slot+(b.start?' '+b.start+'–'+b.end+' น.':'')+' · '+b.hours+' ชั่วโมง'],
       ['บริการ',b.service+(b.print&&b.print!=='-'?' · '+(b.print==='ไม่พิมพ์'?'ไม่พิมพ์ภาพ':'พิมพ์ '+b.print+' นิ้ว'):'')+(b.wishes?' · เขียนคำอวยพร':'')], b.backdrop?['ฉาก',b.backdrop]:null, ['สถานที่',b.venue||'–'] ]); };
-  var money=function(b){ return kv([ ['ราคาแพ็กเกจ',fmt(b.price)+' บาท'], b.extra?['บริการเสริม',fmt(b.extra)+' บาท']:null, b.travel?['ค่าเดินทาง',fmt(b.travel)+' บาท']:null, ['ยอดรวม',fmt(b.total)+' บาท','total'] ]); };
+  var money=function(b,after){ var more=after&&(b.overtimeFee||b.adjust); return kv([ ['ราคาแพ็กเกจ',fmt(b.price)+' บาท'], b.extra?['บริการเสริม',fmt(b.extra)+' บาท']:null, b.travel?['ค่าเดินทาง',fmt(b.travel)+' บาท']:null,
+      more&&b.overtimeFee?['ต่อเวลา '+b.overtimeHours+' ชั่วโมง',fmt(b.overtimeFee)+' บาท']:null, more&&b.adjust?[b.adjustNote||'ปรับยอด',(b.adjust<0?'− ':'')+fmt(Math.abs(b.adjust))+' บาท']:null,
+      ['ยอดรวม',fmt(more?b.grand:b.total)+' บาท','total'] ]); };
   var copyRow=function(label,value){ var btn=el('button',{type:'button',text:'คัดลอก'}); btn.onclick=function(){ var done=function(){ btn.textContent='คัดลอกแล้ว'; setTimeout(function(){ btn.textContent='คัดลอก'; },1500); }; if(navigator.clipboard) navigator.clipboard.writeText(String(value)).then(done,function(){}); }; return el('div',{class:'copy'},[el('div',{},[el('div',{style:'font-size:13px;color:var(--muted)',text:label}),el('b',{text:String(value)})]),btn]); };
 
   function uploader(b,kind,label){
-    var box=el('div'), fi=el('input',{type:'file',accept:kind==='slip'?'image/*':'image/*,application/pdf'}), out=el('div');
+    var isSlip=kind!=='card', fnName={slip:'bookingSlip',card:'bookingCard',pay:'bookingPay'}[kind];
+    var box=el('div'), fi=el('input',{type:'file',accept:isSlip?'image/*':'image/*,application/pdf'}), out=el('div');
     var btn=el('button',{class:'btn primary',type:'button',text:label});
     btn.onclick=function(){ out.innerHTML=''; if(!fi.files[0]) return out.appendChild(el('div',{class:'msg bad',text:'กรุณาเลือกไฟล์ก่อน'}));
       btn.disabled=true; btn.textContent='กำลังส่ง…';
-      readFile(fi.files[0],kind==='slip').then(function(f){ return api(kind==='slip'?'bookingSlip':'bookingCard',auth.id,auth.last4,f); })
-        .then(function(nb){ render(nb, kind==='slip'?'ส่งสลิปแล้ว ทีมงานจะตรวจสอบและส่งใบจองให้ทางอีเมล':'ได้รับไฟล์การ์ดเชิญแล้ว ขอบคุณค่ะ'); })
+      readFile(fi.files[0],isSlip).then(function(f){ return api(fnName,auth.id,auth.last4,f); })
+        .then(function(nb){ render(nb, {slip:'ส่งสลิปแล้ว ทีมงานจะตรวจสอบและส่งใบจองให้ทางอีเมล',pay:'ส่งสลิปแล้ว ทีมงานจะตรวจสอบและส่งใบเสร็จให้ทางอีเมล',card:'ได้รับไฟล์การ์ดเชิญแล้ว ขอบคุณค่ะ'}[kind]); })
         .catch(function(e){ btn.disabled=false; btn.textContent=label; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); });
     };
-    box.appendChild(el('label',{},[el('span',{text:kind==='slip'?'รูปสลิปโอนเงิน':'การ์ดเชิญ (รูปภาพหรือ PDF)'}),fi])); box.appendChild(out); box.appendChild(el('div',{class:'btns'},[btn]));
+    box.appendChild(el('label',{},[el('span',{text:isSlip?'รูปสลิปโอนเงิน':'การ์ดเชิญ (รูปภาพหรือ PDF)'}),fi])); box.appendChild(out); box.appendChild(el('div',{class:'btns'},[btn]));
     return box;
   }
+  function balanceBox(b){
+    var sec=el('section',{class:'noprint'});
+    sec.appendChild(el('h2',{text:'ชำระยอดคงเหลือ'}));
+    if(b.balanceNote) sec.appendChild(el('div',{class:'msg bad',text:'ข้อความจากทีมงาน: '+b.balanceNote}));
+    sec.appendChild(el('p',{class:'center sub',text:'ยอดที่ต้องโอน'+(b.dueDate?' ภายใน '+thLong(b.dueDate).replace(/^\S+ที่ /,''):'')}));
+    sec.appendChild(el('p',{class:'center big',text:fmt(b.due)+' บาท'}));
+    sec.appendChild(el('img',{class:'qr',src:QR,alt:'QR พร้อมเพย์ '+b.pay.bankName}));
+    sec.appendChild(el('p',{class:'hint center',style:'margin:0 0 8px',text:'สแกน QR แล้วพิมพ์ยอด '+fmt(b.due)+' บาทด้วยตัวเอง'}));
+    sec.appendChild(copyRow('ยอดโอน (บาท)',b.due));
+    if(b.pay.bankAccount) sec.appendChild(copyRow(b.pay.bankName+(b.pay.bankAccountName?' · '+b.pay.bankAccountName:''),b.pay.bankAccount));
+    sec.appendChild(el('h3',{text:'โอนแล้ว แนบสลิปที่นี่'}));
+    sec.appendChild(uploader(b,'pay','ส่งสลิป'));
+    return sec;
+  }
+  var filesBox=function(b){ return b.fileLink?el('section',{class:'noprint'},[el('h2',{text:'ไฟล์งานของคุณ'}),el('a',{class:'btn primary',href:b.fileLink,target:'_blank',rel:'noopener',text:'เปิดลิงก์ไฟล์ภาพและวิดีโอ'}),el('p',{class:'hint',style:'margin:8px 0 0',text:'ร้านเก็บไฟล์ไว้ให้ดาวน์โหลด 30 วันหลังงาน'})]):null; };
   function payBox(b){
     var sec=el('section',{class:'noprint'});
     sec.appendChild(el('h2',{text:b.status==='สลิปมีปัญหา'?'แนบสลิปใหม่':'ชำระมัดจำ'}));
@@ -196,16 +215,20 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
   }
   function docBox(b,kind){
     var isQuote=kind==='quote', sec=el('section',{class:'doc'});
-    sec.appendChild(el('h2',{text:isQuote?'ใบเสนอราคา':'ใบจอง'}));
+    sec.appendChild(el('h2',{text:{quote:'ใบเสนอราคา',booking:'ใบจอง',invoice:'ใบแจ้งชำระ',receipt:'ใบเสร็จรับเงิน'}[kind]}));
     sec.appendChild(el('p',{class:'seller',text:b.seller.name+' · '+b.seller.address+' · โทร '+b.seller.phones}));
     var created=b.created?b.created.slice(0,10):'';
-    sec.appendChild(el('div',{class:'no'},[el('span',{},['เลขที่ ',el('b',{text:b.id})]),el('span',{text:created&&/^\d{4}-\d{2}-\d{2}$/.test(created)?'วันที่ '+thLong(created).replace(/^\S+ที่ /,''):''})]));
+    var docNo=kind==='invoice'?(b.invoiceNo||b.id):kind==='receipt'?(b.receiptNo||b.id):b.id, short=function(iso){ return thLong(iso).replace(/^\S+ที่ /,''); };
+    if(kind==='invoice'&&b.finishedAt) created=b.finishedAt.slice(0,10); if(kind==='receipt'&&b.paidAt) created=b.paidAt.slice(0,10);
+    sec.appendChild(el('div',{class:'no'},[el('span',{},['เลขที่ ',el('b',{text:docNo}),docNo!==b.id?' · การจอง '+b.id:'']),el('span',{text:created&&/^\d{4}-\d{2}-\d{2}$/.test(created)?'วันที่ '+thLong(created).replace(/^\S+ที่ /,''):''})]));
     sec.appendChild(kv([['ลูกค้า',b.customer],b.host?['เจ้าของงาน',b.host]:null,['ประเภทงาน',b.eventType||'–']]));
     sec.appendChild(el('h3',{text:'รายละเอียดงาน'})); sec.appendChild(summary(b));
-    sec.appendChild(el('h3',{text:'ราคา'})); sec.appendChild(money(b));
+    sec.appendChild(el('h3',{text:'ราคา'})); sec.appendChild(money(b,kind==='invoice'||kind==='receipt'));
     if(isQuote){ var until=created?addDays(created,b.quoteDays):''; sec.appendChild(el('div',{class:'msg info'},['มัดจำเมื่อจอง '+fmt(b.deposit)+' บาท'+(until?' · ใบเสนอราคานี้ใช้ได้ถึง '+thLong(until).replace(/^\S+ที่ /,''):'')+' · ยังไม่ได้กันคิว'])); }
+    else if(kind==='invoice') sec.appendChild(kv([ b.payStatus==='มัดจำแล้ว'?['มัดจำที่ชำระแล้ว','− '+fmt(b.deposit)+' บาท']:null, ['ยอดที่ต้องชำระ'+(b.dueDate?' ภายใน '+short(b.dueDate):''),fmt(b.due)+' บาท','total'] ]));
+    else if(kind==='receipt') sec.appendChild(el('div',{class:'msg ok',text:'ได้รับชำระครบแล้ว '+fmt(b.grand)+' บาท'+(b.paidAt?' เมื่อ '+short(b.paidAt.slice(0,10)):'')}));
     else sec.appendChild(kv([['มัดจำที่ชำระแล้ว',fmt(b.deposit)+' บาท'],['ยอดคงเหลือ ชำระภายในวันถัดไปหลังจบงาน',fmt(b.balance)+' บาท','total']]));
-    var terms=termsNode(false); sec.appendChild(terms);
+    var terms=termsNode(false); if(kind==='quote'||kind==='booking') sec.appendChild(terms);
     window.onbeforeprint=function(){ terms.open=true; };
     sec.appendChild(el('div',{class:'btns noprint'},[el('button',{class:'btn',type:'button',text:'พิมพ์ หรือบันทึกเป็น PDF',onclick:function(){ terms.open=true; window.print(); }})]));
     return sec;
@@ -223,6 +246,9 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
     else if(s==='ใบเสนอราคา'){ view.appendChild(docBox(b,'quote'));
       var p=new URLSearchParams({date:b.date,slot:b.slot,service:b.service,print:b.print,hours:b.hours,area:b.area});
       view.appendChild(el('section',{class:'noprint'},[el('a',{class:'btn primary',href:'book.html?'+p.toString(),text:'จองคิวตามใบเสนอราคานี้'}),el('p',{class:'hint',style:'margin:8px 0 0',text:'ระบบจะเช็กคิวว่างอีกครั้งตอนจอง'})])); }
+    else if(s==='จบงาน รอชำระ'){ view.appendChild(balanceBox(b)); var fb=filesBox(b); if(fb) view.appendChild(fb); view.appendChild(docBox(b,'invoice')); }
+    else if(s==='รอตรวจยอดคงเหลือ'){ head.appendChild(el('p',{text:'ได้รับสลิปยอดคงเหลือแล้ว ทีมงานกำลังตรวจสอบ และจะส่งใบเสร็จไปที่ '+b.email})); var fb2=filesBox(b); if(fb2) view.appendChild(fb2); view.appendChild(docBox(b,'invoice')); }
+    else if(s==='ปิดงาน'){ head.appendChild(el('p',{text:'ขอบคุณที่ใช้บริการ Nan Photo Booth ค่ะ'})); var fb3=filesBox(b); if(fb3) view.appendChild(fb3); view.appendChild(docBox(b,'receipt')); }
     else if(s==='ยืนยันคิว'||s==='รอยืนยัน'||s==='เสร็จงาน'){ view.appendChild(docBox(b,'booking'));
       if(s!=='เสร็จงาน'&&!b.hasCard) view.appendChild(el('section',{class:'noprint'},[el('h2',{text:'ส่งการ์ดเชิญ'}),el('p',{class:'sub',style:'margin:0 0 12px',text:'ใช้ออกแบบเทมเพลตให้เข้ากับธีมงาน ส่งล่วงหน้าอย่างน้อย 7 วันก่อนวันงาน'}),uploader(b,'card','ส่งการ์ดเชิญ')]));
       else if(b.hasCard) head.appendChild(el('p',{class:'hint',style:'margin:8px 0 0',text:'ได้รับการ์ดเชิญแล้ว'})); }

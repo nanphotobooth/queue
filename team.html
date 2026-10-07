@@ -64,6 +64,14 @@
   .quote{font-size:13px;color:var(--muted);grid-column:1/-1}
   .quote button{border:0;background:none;text-decoration:underline;font:inherit;color:var(--ink);cursor:pointer;padding:6px 0}
   .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+  .tx{display:flex;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:6px;font-size:14px}
+  .tx b{white-space:nowrap;font-variant-numeric:tabular-nums}
+  .tx .in{color:var(--ok)} .tx .out{color:var(--bad)}
+  .exp{display:grid;grid-template-columns:1.1fr 1.6fr .9fr;gap:6px;margin-bottom:6px}
+  .js h2{margin:14px 0 4px;color:var(--ink);font-size:15px}
+  .js label.check{display:flex;gap:10px;align-items:center;font-size:15px;margin:6px 0}
+  .js label.check input{width:22px;min-height:22px;height:22px}
+  @media print{ body>.wrap{display:none} dialog{position:static;height:auto;max-height:none} .noprint{display:none!important} }
   .slip{display:block;max-width:100%;max-height:70vh;margin:0 auto 10px;border-radius:10px;border:1px solid var(--line)}
   .ro{font-size:14px;margin:0}
   .ro dt{color:var(--muted);font-size:12px;margin-top:8px}
@@ -132,6 +140,8 @@
     var review=d.bookings.filter(function(b){ return b.status==='รอตรวจมัดจำ'; }).sort(function(a,b){ return order(a)<order(b)?-1:1; });
     var up=act.filter(function(b){ return b.date>=today; }).sort(function(a,b){ return order(a)<order(b)?-1:1; });
     var wk=up.filter(function(b){ return b.date<addDays(today,7); });
+    var due=function(b){ if(b.payStatus==='ชำระครบ'||b.total===undefined||b.total==='') return 0; var g=(+b.total||0)+(+b.overtimeFee||0)+(+b.adjust||0); return Math.max(0,g-(b.payStatus==='มัดจำแล้ว'?(+b.deposit||0):0)); }; S.due=due;
+    var close=d.bookings.filter(function(b){ return b.status==='จบงาน รอชำระ'||b.status==='รอตรวจยอดคงเหลือ'||(b.status==='ยืนยันคิว'&&b.date<=today); }).sort(function(a,b){ return order(a)<order(b)?-1:1; });
     var need=up.filter(function(b){ return (b.status==='ยืนยันคิว'||b.status==='รอยืนยัน')&&missing(b).length; });
     if(S.tab==='up'&&review.length&&!S.seenReview){ S.tab='review'; } S.seenReview=true;
     app.appendChild(el('div',{class:'stats'},[
@@ -139,34 +149,36 @@
       el('div',{class:'stat'},[el('b',{text:up.length}),el('span',{text:'คิวล่วงหน้า'})]),
       el('div',{class:'stat'},[el('b',{text:review.length}),el('span',{text:'สลิปรอตรวจ'})]) ]));
     var tabs=el('div',{class:'tabs',style:'margin-top:12px'});
-    [['review','ตรวจสลิป'+(review.length?' ('+review.length+')':'')],['up','คิวล่วงหน้า'],['need','ข้อมูลไม่ครบ'+(need.length?' ('+need.length+')':'')],['past','ที่ผ่านมา'],['block','ปิดวัน']].forEach(function(t){ tabs.appendChild(el('button',{class:S.tab===t[0]?'on':'',text:t[1],onclick:function(){ S.tab=t[0]; main(); }})); });
+    [['review','ตรวจสลิป'+(review.length?' ('+review.length+')':'')],['close','ปิดงาน/รับเงิน'+(close.length?' ('+close.length+')':'')],['up','คิวล่วงหน้า'],['need','ข้อมูลไม่ครบ'+(need.length?' ('+need.length+')':'')],['past','ที่ผ่านมา'],['ledger','บัญชี'],['block','ปิดวัน']].forEach(function(t){ tabs.appendChild(el('button',{class:S.tab===t[0]?'on':'',text:t[1],onclick:function(){ S.tab=t[0]; main(); }})); });
     app.appendChild(tabs);
     if(S.tab==='block'){ blocksView(app); }
+    else if(S.tab==='ledger'){ ledgerView(app); }
     else{
       var q=el('input',{class:'search',type:'search',placeholder:'ค้นหาชื่อลูกค้า สถานที่ หรือเลขที่การจอง',value:S.q,'aria-label':'ค้นหา'});
       q.oninput=function(){ S.q=q.value; list(); }; app.appendChild(q);
       var box=el('div',{id:'list'}); app.appendChild(box);
       var list=function(){
         box.innerHTML='';
-        var rows = S.tab==='review'?review : S.tab==='up'?up : S.tab==='need'?need : d.bookings.filter(function(b){ return b.date<today||LIVE.indexOf(b.status)<0; }).sort(function(a,b){ return order(a)<order(b)?1:-1; });
+        var rows = S.tab==='review'?review : S.tab==='close'?close : S.tab==='up'?up : S.tab==='need'?need : d.bookings.filter(function(b){ return b.date<today||LIVE.indexOf(b.status)<0; }).sort(function(a,b){ return order(a)<order(b)?1:-1; });
         var k=S.q.trim().toLowerCase();
         if(k) rows=rows.filter(function(b){ return (b.customer+' '+b.venue+' '+b.id+' '+b.phone).toLowerCase().indexOf(k)>=0; });
-        if(!rows.length){ box.appendChild(el('div',{class:'empty',text:k?'ไม่พบคิวที่ค้นหา':(S.tab==='review'?'ไม่มีสลิปรอตรวจ':'ไม่มีคิวในรายการนี้')})); return; }
+        if(!rows.length){ box.appendChild(el('div',{class:'empty',text:k?'ไม่พบคิวที่ค้นหา':(S.tab==='review'?'ไม่มีสลิปรอตรวจ':S.tab==='close'?'ไม่มีงานที่ต้องปิดหรือยอดค้างรับ':'ไม่มีคิวในรายการนี้')})); return; }
         var lastM='';
         rows.forEach(function(b){
           var m=b.date.slice(0,7); if(m!==lastM){ lastM=m; box.appendChild(el('h2',{text:MONF[+m.slice(5)-1]+' '+(+m.slice(0,4)+543)})); }
-          var cls=b.status==='ยืนยันคิว'?'ok':['รอยืนยัน','รอตรวจมัดจำ','ถือคิวชั่วคราว','สลิปมีปัญหา'].indexOf(b.status)>=0?'warn':['ยกเลิก','ปฏิเสธ','หมดเวลา'].indexOf(b.status)>=0?'bad':'off';
+          var cls=(b.status==='ยืนยันคิว'||b.status==='ปิดงาน')?'ok':['รอยืนยัน','รอตรวจมัดจำ','ถือคิวชั่วคราว','สลิปมีปัญหา','จบงาน รอชำระ','รอตรวจยอดคงเหลือ'].indexOf(b.status)>=0?'warn':['ยกเลิก','ปฏิเสธ','หมดเวลา'].indexOf(b.status)>=0?'bad':'off';
           var miss=(b.status==='ยืนยันคิว'||b.status==='รอยืนยัน')&&b.date>=today?missing(b):[];
           box.appendChild(el('button',{class:'card',type:'button',onclick:function(){ form(b); }},[
             el('div',{class:'r1'},[ el('span',{class:'when',text:thDate(b.date)+' · '+b.slot+(b.start?' '+b.start+'–'+b.end:'')}), el('span',{class:'chip '+cls,text:b.status}) ]),
             el('div',{class:'cust',text:b.customer+(b.venue?' · '+b.venue:'')}),
             el('div',{class:'meta',text:[b.service+(b.hours?' '+b.hours+' ชม.':''), b.print&&b.print!=='-'?b.print:'', b.total!==undefined&&b.total!==''?fmt(b.total)+' บาท':'', b.payStatus||''].filter(String).join(' · ')}),
-            miss.length?el('div',{class:'miss',text:'ยังขาด: '+miss.join(', ')}):null ]));
+            miss.length?el('div',{class:'miss',text:'ยังขาด: '+miss.join(', ')}):null,
+            S.tab==='close'?el('div',{class:'miss',text:b.status==='ยืนยันคิว'?'ถึงวันงานแล้ว รอกดจบงาน':b.status==='รอตรวจยอดคงเหลือ'?'มีสลิปยอดคงเหลือรอตรวจ '+fmt(due(b))+' บาท':'ค้างรับ '+fmt(due(b))+' บาท'}):null ]));
         });
       };
       list();
     }
-    if(S.me.canEdit && S.tab!=='block') app.appendChild(el('button',{class:'fab',text:'+ เพิ่มคิว',onclick:function(){ form(null); }}));
+    if(S.me.canEdit && S.tab!=='block' && S.tab!=='ledger') app.appendChild(el('button',{class:'fab',text:'+ เพิ่มคิว',onclick:function(){ form(null); }}));
   }
 
   /* ---------- blocked dates ---------- */
@@ -190,7 +202,7 @@
   function fileView(b,kind,holder){
     holder.innerHTML=''; holder.appendChild(el('div',{class:'empty',text:'กำลังโหลดไฟล์…'}));
     api('adminFile',S.token,b.id,kind).then(function(f){ holder.innerHTML=''; var url='data:'+f.mime+';base64,'+f.data;
-      if(/^image\//.test(f.mime)) holder.appendChild(el('img',{class:'slip',src:url,alt:kind==='slip'?'สลิปมัดจำ':'การ์ดเชิญ'}));
+      if(/^image\//.test(f.mime)) holder.appendChild(el('img',{class:'slip',src:url,alt:{slip:'สลิปมัดจำ',balance:'สลิปยอดคงเหลือ',card:'การ์ดเชิญ'}[kind]}));
       else holder.appendChild(el('a',{class:'btn',href:url,download:f.name,text:'ดาวน์โหลด '+f.name}));
     }).catch(function(e){ holder.innerHTML=''; holder.appendChild(el('div',{class:'msg bad',text:errText(e)})); });
   }
@@ -216,6 +228,77 @@
     if(b.cardFile) links.appendChild(el('button',{class:'btn',type:'button',text:'ดูการ์ดเชิญ',onclick:function(){ fileView(b,'card',holder); }}));
     if(b.slipFile&&b.status!=='รอตรวจมัดจำ') links.appendChild(el('button',{class:'btn',type:'button',text:'ดูสลิปมัดจำ',onclick:function(){ fileView(b,'slip',holder); }}));
     return el('fieldset',{},[ el('legend',{text:'ข้อมูลจากฟอร์มจอง'}), dl, links, holder ]);
+  }
+
+  /* ---------- finish job / settle balance / job sheet / ledger ---------- */
+  function finishBox(b){
+    var L=S.lists, ot=el('select',{'aria-label':'ต่อเวลา'}), adj=el('input',{type:'number',inputmode:'numeric',placeholder:'0'}), adjNote=el('input',{type:'text',placeholder:'เช่น ส่วนต่างฉากพิเศษ หรือส่วนลด',maxlength:200}), link=el('input',{type:'url',placeholder:'https://drive.google.com/...'}), note=el('input',{type:'text',maxlength:300}), out=el('div'), sum=el('div',{class:'quote'}), exps=el('div');
+    [0,0.5,1,1.5,2,3,4].forEach(function(h){ ot.appendChild(el('option',{value:h,text:h?h+' ชั่วโมง (+'+fmt(h*L.settings.overtimeRate)+')':'ไม่มี'})); });
+    var calc=function(){ var c={total:b.total,deposit:b.deposit,payStatus:b.payStatus,overtimeFee:(+ot.value||0)*L.settings.overtimeRate,adjust:+adj.value||0}; sum.textContent='ยอดที่ลูกค้าต้องชำระหลังจบงาน: '+fmt(S.due(c))+' บาท'; };
+    ot.onchange=adj.oninput=calc;
+    var addExp=function(){ var cat=el('select',{'aria-label':'หมวดรายจ่าย'}); L.txCats['จ่าย'].forEach(function(c){ cat.appendChild(el('option',{text:c})); }); exps.appendChild(el('div',{class:'exp'},[cat,el('input',{type:'text',placeholder:'รายการ',maxlength:200,'aria-label':'รายการรายจ่าย'}),el('input',{type:'number',inputmode:'numeric',placeholder:'บาท',min:0,'aria-label':'จำนวนเงิน'})])); };
+    var btn=el('button',{class:'btn primary',type:'button',text:'จบงานและส่งใบแจ้งชำระ'});
+    btn.onclick=function(){ out.innerHTML=''; var list=[].map.call(exps.children,function(r){ var c=r.children; return {cat:c[0].value,desc:c[1].value,amount:+c[2].value||0}; }).filter(function(x){ return x.amount>0; });
+      if(!confirm('จบงาน '+b.id+' ของ '+b.customer+' ใช่ไหม ระบบจะส่งใบแจ้งชำระให้ลูกค้าทางอีเมลทันที')) return; btn.disabled=true; btn.textContent='กำลังบันทึก…';
+      api('adminFinish',S.token,b.id,{overtimeHours:+ot.value||0,adjust:+adj.value||0,adjustNote:adjNote.value,fileLink:link.value,note:note.value,expenses:list}).then(function(r){ $('dlg').close(); refresh('จบงาน '+b.id+' แล้ว'+(r.status==='ปิดงาน'?' ลูกค้าชำระครบ ระบบส่งใบเสร็จแล้ว':' ระบบส่งใบแจ้งชำระให้ลูกค้าแล้ว')); })
+        .catch(function(e){ btn.disabled=false; btn.textContent='จบงานและส่งใบแจ้งชำระ'; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+    var lab=function(t,n,full){ return el('label',{class:full?'full':''},[el('span',{text:t}),n]); };
+    calc();
+    return el('fieldset',{},[ el('legend',{text:'จบงาน'}), el('div',{class:'f'},[ lab('ต่อเวลาหน้างาน',ot), lab('ปรับยอด (+ เพิ่ม / − ลด)',adj), lab('เหตุผลที่ปรับยอด',adjNote,true), lab('ลิงก์ส่งไฟล์งาน (ใส่ภายหลังได้)',link,true), lab('หมายเหตุหน้างาน',note,true), sum ]),
+      el('h2',{style:'margin:10px 0 6px',text:'รายจ่ายของงานนี้'}), exps, el('button',{class:'btn',type:'button',style:'min-height:40px;margin-bottom:10px',text:'+ เพิ่มรายจ่าย',onclick:addExp}), out, btn ]);
+  }
+  function settleBox(b){
+    var img=el('div'), out=el('div'), msg=el('textarea',{placeholder:'หมายเหตุ เช่น รับเงินสดหน้างาน หรือข้อความถึงลูกค้าเมื่อแจ้งปัญหา','aria-label':'หมายเหตุ'});
+    var btns=[], act=function(action,label,confirmText){ var bt=el('button',{class:'btn'+(action==='approve'?' primary':''),type:'button',text:label}); btns.push(bt);
+      bt.onclick=function(){ out.innerHTML=''; if(action==='fix'&&!msg.value.trim()) return out.appendChild(el('div',{class:'msg bad',text:'พิมพ์ข้อความถึงลูกค้าก่อน'})); if(confirmText&&!confirm(confirmText)) return;
+        btns.forEach(function(x){ x.disabled=true; }); bt.textContent='กำลังบันทึก…';
+        api('adminSettle',S.token,b.id,action,msg.value).then(function(){ $('dlg').close(); refresh(action==='approve'?'รับยอดคงเหลือ '+b.id+' แล้ว ระบบส่งใบเสร็จให้ลูกค้าและลงบัญชีให้':'แจ้งปัญหาสลิปให้ลูกค้าแล้ว'); })
+          .catch(function(e){ btns.forEach(function(x){ x.disabled=false; }); bt.textContent=label; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+      return bt; };
+    var box=el('fieldset',{},[ el('legend',{text:'รับยอดคงเหลือ'}), el('p',{style:'margin:0 0 8px'},['ยอดที่ต้องได้ ',el('b',{text:fmt(S.due(b))+' บาท'}),b.invoiceNo?' · '+b.invoiceNo:'']), img ]);
+    if(b.balanceNote) box.appendChild(el('p',{class:'meta',style:'font-size:13px;color:var(--muted)',text:'แจ้งลูกค้าไว้ว่า: '+b.balanceNote}));
+    if(b.status==='รอตรวจยอดคงเหลือ') fileView(b,'balance',img); else img.appendChild(el('p',{style:'font-size:14px;color:var(--muted);margin:0 0 8px',text:'ลูกค้ายังไม่ได้แนบสลิป ถ้าได้รับเงินทางอื่นแล้ว กดยืนยันรับเงินได้เลย'}));
+    if(S.me.canEdit){ box.appendChild(msg); box.appendChild(out); box.appendChild(el('div',{class:'actions'},[ b.status==='รอตรวจยอดคงเหลือ'?act('fix','แจ้งปัญหาสลิป'):el('span'), act('approve','ยืนยันรับเงินครบ','ยืนยันว่าได้รับยอดคงเหลือ '+fmt(S.due(b))+' บาทของ '+b.id+' ใช่ไหม') ])); }
+    return box;
+  }
+  function jobSheet(b){
+    var sheet=$('sheet'); sheet.innerHTML=''; sheet.className='sheet js';
+    var row=function(k,v){ return v?el('div',{},[el('span',{style:'color:var(--muted);font-size:13px',text:k+' '}),el('b',{text:String(v)})]):null; };
+    sheet.appendChild(el('div',{class:'bar noprint'},[ el('h1',{text:'ใบงานหน้างาน'}), el('div',{},[el('button',{class:'btn',type:'button',style:'margin-right:6px',text:'พิมพ์',onclick:function(){ window.print(); }}),el('button',{class:'btn',type:'button',text:'กลับ',onclick:function(){ sheet.className='sheet'; form(b); }})]) ]));
+    sheet.appendChild(el('fieldset',{},[ el('legend',{text:b.id+' · '+thDate(b.date)}), row('เวลา','รอบ'+b.slot+(b.start?' '+b.start+'–'+b.end:'')), row('บริการ',b.service+(b.hours?' '+b.hours+' ชม.':'')+(b.print&&b.print!=='-'?' · '+b.print:'')+(b.wishes?' · เขียนคำอวยพร':'')), row('ฉาก',b.backdrop), row('สถานที่',b.venue+(b.place?' ('+b.place+')':'')), row('พื้นที่',b.area),
+      row('ลูกค้า',b.customer+(b.phone?' · '+b.phone:'')), row('ผู้ประสานงาน',[b.coordName,b.coordPhone].filter(String).join(' · ')), row('เจ้าของงาน',b.host), row('ข้อความบนเทมเพลต',b.templateText), row('โทนสี',b.theme), row('หมายเหตุ',b.note),
+      (b.mapLink&&/^https?:\/\//i.test(b.mapLink))?el('a',{class:'btn noprint',style:'margin-top:8px;display:inline-flex;align-items:center;text-decoration:none',href:b.mapLink,target:'_blank',rel:'noopener',text:'เปิดแผนที่'}):null ]));
+    var items=['กล้อง เลนส์ แบตเตอรี่ และเมมโมรี่การ์ด','ไฟสตูดิโอ ขาไฟ และซอฟต์บ็อกซ์','โครงฉากและผ้าฉาก'+(b.backdrop?' ('+b.backdrop+')':''),'เครื่องพิมพ์ กระดาษ และหมึกสำรอง','ไอแพด/คอมพิวเตอร์ และเทมเพลตของงานนี้','พร็อพ โต๊ะ ผ้าปูโต๊ะ','ปลั๊กพ่วง สายไฟ สาย USB','กรอบรูปของแถม'];
+    if(/Video Guestbook/.test(b.service)) items.push('เครื่อง Video Guestbook และคลิปต้อนรับของงานนี้');
+    if(b.wishes) items.push('อัลบั้ม ปากกา และอุปกรณ์เขียนคำอวยพร');
+    if(b.place==='กลางแจ้ง') items.push('เต็นท์หรือหลังคากันแดดกันฝน');
+    var fs=el('fieldset',{},[el('legend',{text:'เช็กลิสต์อุปกรณ์'})]); items.forEach(function(t){ fs.appendChild(el('label',{class:'check'},[el('input',{type:'checkbox'}),t])); }); sheet.appendChild(fs);
+    if(!$('dlg').open) $('dlg').showModal(); $('dlg').scrollTop=0;
+  }
+  function ledgerView(app){
+    var box=el('div',{style:'margin-top:12px'}); app.appendChild(box);
+    var MON2=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    var draw=function(r){
+      box.innerHTML=''; S.ym=r.ym; var m=r.months[r.ym]||{inc:0,exp:0}, y=+r.ym.slice(0,4), mo=+r.ym.slice(5);
+      var go=function(n){ var d=new Date(Date.UTC(y,mo-1+n,1)); load(d.getUTCFullYear()+'-'+('0'+(d.getUTCMonth()+1)).slice(-2)); };
+      box.appendChild(el('div',{class:'top'},[ el('button',{class:'btn',type:'button',style:'min-height:44px',text:'‹','aria-label':'เดือนก่อนหน้า',onclick:function(){ go(-1); }}), el('b',{text:MON2[mo-1]+' '+(y+543)}), el('button',{class:'btn',type:'button',style:'min-height:44px',text:'›','aria-label':'เดือนถัดไป',onclick:function(){ go(1); }}) ]));
+      box.appendChild(el('div',{class:'stats'},[ el('div',{class:'stat'},[el('b',{text:fmt(m.inc)}),el('span',{text:'รายรับ'})]), el('div',{class:'stat'},[el('b',{text:fmt(m.exp)}),el('span',{text:'รายจ่าย'})]), el('div',{class:'stat'},[el('b',{text:fmt(m.inc-m.exp)}),el('span',{text:'คงเหลือเดือนนี้'})]) ]));
+      if(S.me.canEdit){
+        var L=S.lists, type=el('select',{'aria-label':'ประเภท'}), cat=el('select',{'aria-label':'หมวด'}), date=el('input',{type:'date',value:S.data.today}), desc=el('input',{type:'text',maxlength:300,placeholder:'เช่น ค่าแรงเบล งาน 10 ต.ค.'}), amt=el('input',{type:'number',inputmode:'numeric',min:0}), bid=el('input',{type:'text',placeholder:'NPB-… (ถ้ามี)',maxlength:20}), out=el('div');
+        ['จ่าย','รับ'].forEach(function(t){ type.appendChild(el('option',{text:t})); });
+        var cats=function(){ cat.innerHTML=''; L.txCats[type.value].forEach(function(c){ cat.appendChild(el('option',{text:c})); }); }; type.onchange=cats; cats();
+        var btn=el('button',{class:'btn primary',type:'button',text:'บันทึกรายการ'});
+        btn.onclick=function(){ out.innerHTML=''; btn.disabled=true; api('adminTxAdd',S.token,{type:type.value,cat:cat.value,date:date.value,desc:desc.value,amount:+amt.value,bookingId:bid.value.trim().toUpperCase()}).then(draw).catch(function(e){ btn.disabled=false; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+        var lab=function(t,n,full){ return el('label',{class:full?'full':''},[el('span',{text:t}),n]); };
+        box.appendChild(el('fieldset',{style:'margin-top:12px'},[ el('legend',{text:'เพิ่มรายการ'}), el('div',{class:'f'},[ lab('ประเภท',type), lab('หมวด',cat), lab('วันที่',date), lab('จำนวนเงิน (บาท)',amt), lab('รายการ',desc,true), lab('เลขที่การจอง',bid,true), el('div',{class:'full'},[out,btn]) ]) ]));
+      }
+      box.appendChild(el('h2',{text:'รายการเดือนนี้ ('+r.rows.length+')'}));
+      if(!r.rows.length) box.appendChild(el('div',{class:'empty',text:'ยังไม่มีรายการในเดือนนี้'}));
+      r.rows.forEach(function(t){ box.appendChild(el('div',{class:'tx'},[ el('div',{},[ el('div',{text:t.desc}), el('div',{style:'font-size:12px;color:var(--muted)',text:thDate(t.date)+' · '+t.cat+(t.bookingId?' · '+t.bookingId:'')+(t.by?' · '+t.by:'')}) ]), el('b',{class:t.type==='รับ'?'in':'out',text:(t.type==='รับ'?'+':'−')+fmt(t.amount)}) ])); });
+      box.appendChild(el('p',{style:'font-size:13px;color:var(--muted)',text:'รายรับมัดจำและยอดคงเหลือลงบัญชีเองเมื่อกดอนุมัติในระบบ แก้ไขหรือลบรายการได้ในแผ่น Transactions ของ Google Sheets'}));
+    };
+    var load=function(ym){ box.innerHTML=''; box.appendChild(el('div',{class:'empty',text:'กำลังโหลดบัญชี…'})); api('adminTxList',S.token,ym||S.ym||'').then(draw).catch(function(e){ box.innerHTML=''; box.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+    load();
   }
 
   /* ---------- booking form ----------  */
@@ -247,6 +330,9 @@
 
     sheet.appendChild(el('div',{class:'bar'},[ el('h1',{text:isNew?'เพิ่มคิว':(b.id||'คิวงาน')}), el('button',{class:'btn',type:'button',text:'ปิด',onclick:function(){ $('dlg').close(); }}) ]));
     if(!isNew&&b.status==='รอตรวจมัดจำ') sheet.appendChild(reviewBox(b));
+    if(!isNew&&(b.status==='จบงาน รอชำระ'||b.status==='รอตรวจยอดคงเหลือ')) sheet.appendChild(settleBox(b));
+    if(!isNew&&S.me.canEdit&&b.status==='ยืนยันคิว'&&b.date<=S.data.today) sheet.appendChild(finishBox(b));
+    if(!isNew) sheet.appendChild(el('div',{class:'actions',style:'margin-bottom:12px'},[el('button',{class:'btn',type:'button',text:'ใบงานหน้างาน',onclick:function(){ jobSheet(b); }}),el('span')]));
     if(!isNew) sheet.appendChild(onlineBox(b));
     sheet.appendChild(el('fieldset',{},[ el('legend',{text:'วันและบริการ'}), el('div',{class:'f'},[
       lab('วันงาน',inp('date','date')), lab('รอบ',sel('slot',L.slots)),
