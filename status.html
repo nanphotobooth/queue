@@ -148,12 +148,49 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
   var decodeBase=function(){ return new Promise(function(res){ var im=new Image(); im.onerror=function(){ res(null); };
     im.onload=function(){ try{ for(var k=1;k<=3;k++){ var c=document.createElement('canvas'); c.width=im.width*k; c.height=im.height*k; var g=c.getContext('2d'); g.imageSmoothingEnabled=k>1; g.drawImage(im,0,0,c.width,c.height); var d=g.getImageData(0,0,c.width,c.height), r=jsQR(d.data,c.width,c.height); if(r&&validBase(r.data)) return res(r.data); } }catch(e){} res(null); };
     im.src=QR; }); };
-  var amountQR=function(img,hint,amount,pay){
-    if(!(amount>0)) return;
-    loadLibs().then(function(){ return basePayload||decodeBase(); }).then(function(p){ if(!p) return; basePayload=p;
-      var q=qrcode(0,'M'); q.addData(withAmount(p,amount)); q.make(); img.src=q.createDataURL(8,24); img.alt='QR พร้อมเพย์ ยอด '+fmt(amount)+' บาท'; img.style.padding='0';
-      hint.textContent='สแกนด้วยแอปธนาคาร ยอด '+fmt(amount)+' บาทจะขึ้นให้เอง กรุณาตรวจชื่อบัญชี'+(pay.bankAccountName?' "'+pay.bankAccountName.replace(/\s+/g,' ')+'"':'')+' ก่อนกดโอน';
-    }).catch(function(){});
+  /* วาดรูป QR เป็นภาพ PNG พื้นขาวขอบกว้าง พร้อมชื่อบัญชีและยอดเงินใต้รูป เพื่อให้สแกนจากจอหรือเปิดจากอัลบั้มในแอปธนาคารได้ง่าย */
+  var drawQR=function(payload,amount,pay){
+    var q=qrcode(0,'M'); q.addData(payload); q.make();
+    var n=q.getModuleCount(), cell=Math.max(8,Math.floor(640/n)), size=n*cell, pad=cell*5, W=size+pad*2, H=W+150;
+    var c=document.createElement('canvas'); c.width=W; c.height=H; var g=c.getContext('2d');
+    g.fillStyle='#fff'; g.fillRect(0,0,W,H); g.fillStyle='#000';
+    for(var r=0;r<n;r++) for(var k=0;k<n;k++) if(q.isDark(r,k)) g.fillRect(pad+k*cell,pad+r*cell,cell,cell);
+    g.textAlign='center'; g.fillStyle='#111';
+    g.font='600 34px "IBM Plex Sans Thai",sans-serif'; g.fillText('ยอดโอน '+Number(amount).toLocaleString('en-US',{minimumFractionDigits:2})+' บาท',W/2,W+38);
+    g.font='26px "IBM Plex Sans Thai",sans-serif'; g.fillText((pay.bankAccountName||'').replace(/\s+/g,' ')||'Nan Photo Booth',W/2,W+82);
+    g.fillStyle='#666'; g.font='22px "IBM Plex Sans Thai",sans-serif'; g.fillText('Nan Photo Booth · พร้อมเพย์ '+(pay.bankName||''),W/2,W+120);
+    return c;
+  };
+  var saveImage=function(canvas,name,out){
+    canvas.toBlob(function(blob){
+      var done=function(t){ out.innerHTML=''; out.appendChild(el('div',{class:'msg ok',text:t})); };
+      try{ var f=new File([blob],name,{type:'image/png'}); if(navigator.canShare&&navigator.canShare({files:[f]})){ navigator.share({files:[f]}).then(function(){ done('บันทึกรูปแล้ว เปิดแอปธนาคาร เลือก "สแกน" แล้วเลือกรูปจากอัลบั้ม'); },function(){}); return; } }catch(e){}
+      var a=el('a',{href:URL.createObjectURL(blob),download:name}); document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },800);
+      done('บันทึกรูปแล้ว เปิดแอปธนาคาร เลือก "สแกน" แล้วเลือกรูปจากอัลบั้ม ถ้าหารูปไม่เจอ ให้กดค้างที่รูป QR แล้วเลือก "บันทึกรูปภาพ"');
+    },'image/png');
+  };
+  /* กล่องชำระเงิน: QR ระบุยอด (ถ้าสร้างได้) · สลับไปใช้ QR เดิมของร้านได้ · เลขบัญชีสำหรับโอนเอง · ข้อความย้ำให้ตรวจชื่อและยอด */
+  var payPanel=function(sec,amount,pay){
+    var name=(pay.bankAccountName||'').replace(/\s+/g,' '), amtText=Number(amount).toLocaleString('en-US',{minimumFractionDigits:2});
+    var img=el('img',{class:'qr',src:QR,alt:'QR พร้อมเพย์ '+(pay.bankName||'')}), hint=el('p',{class:'hint center',style:'margin:0 0 8px',text:'สแกน QR แล้วพิมพ์ยอด '+fmt(amount)+' บาทด้วยตัวเอง'});
+    var tools=el('div',{class:'btns',style:'margin:0 0 4px'}), out=el('div'), canvas=null, mode='shop';
+    var saveBtn=el('button',{class:'btn',type:'button',text:'บันทึกรูป QR ลงเครื่อง'}), swap=el('button',{class:'link',type:'button',style:'display:none'});
+    var show=function(m){ mode=m; out.innerHTML='';
+      if(m==='amount'&&canvas){ img.src=canvas.toDataURL('image/png'); img.alt='QR พร้อมเพย์ ยอด '+amtText+' บาท'; img.style.padding='0'; hint.textContent='สแกนแล้วยอด '+amtText+' บาทจะขึ้นให้เอง ไม่ต้องพิมพ์ยอด'; swap.textContent='แอปธนาคารสแกนไม่ได้ หรือยอดไม่ขึ้น? ใช้ QR เดิมของร้านแทน'; }
+      else{ img.src=QR; img.alt='QR พร้อมเพย์ '+(pay.bankName||''); img.style.padding=''; hint.textContent='QR เดิมของร้าน: สแกนแล้วพิมพ์ยอด '+amtText+' บาทด้วยตัวเอง'; swap.textContent='กลับไปใช้ QR ที่ใส่ยอดเงินให้แล้ว'; }
+      swap.style.display=canvas?'':'none'; };
+    swap.onclick=function(){ show(mode==='amount'?'shop':'amount'); };
+    saveBtn.onclick=function(){ if(mode==='amount'&&canvas) return saveImage(canvas,'NanPhotoBooth-QR-'+Math.round(amount)+'.png',out);
+      var im=new Image(); im.onload=function(){ var c=document.createElement('canvas'); c.width=im.width; c.height=im.height; c.getContext('2d').drawImage(im,0,0); saveImage(c,'NanPhotoBooth-QR.png',out); }; im.src=QR; };
+    tools.appendChild(saveBtn);
+    sec.appendChild(el('div',{class:'msg warn',style:'font-size:15px'},[ el('b',{text:'ก่อนกดยืนยันโอน กรุณาตรวจ 2 อย่างในแอปธนาคาร'}), el('br'), '1. ชื่อบัญชีผู้รับ: ', el('b',{text:name||'ตามที่แสดงด้านล่าง'}), el('br'), '2. จำนวนเงิน: ', el('b',{text:amtText+' บาท'}), el('br'), el('span',{style:'font-size:13px',text:'ถ้าชื่อหรือยอดไม่ตรง อย่าเพิ่งโอน ให้ทักแชทเพจก่อน'}) ]));
+    sec.appendChild(img); sec.appendChild(hint); sec.appendChild(tools); sec.appendChild(out); sec.appendChild(el('p',{class:'center',style:'margin:0 0 8px'},[swap]));
+    sec.appendChild(el('p',{class:'hint',style:'margin:0 0 8px',text:'ใช้มือถือเครื่องเดียว: กด "บันทึกรูป QR ลงเครื่อง" แล้วเปิดแอปธนาคาร > สแกน > เลือกรูปจากอัลบั้ม หรือคัดลอกเลขบัญชีด้านล่างไปโอนเองได้'}));
+    sec.appendChild(copyRow('ยอดโอน (บาท)',amount));
+    if(pay.bankAccount) sec.appendChild(copyRow((pay.bankName||'')+(name?' · '+name:''),pay.bankAccount));
+    if(amount>0) loadLibs().then(function(){ return basePayload||decodeBase(); }).then(function(p){ if(!p) return; basePayload=p; var pl=withAmount(p,amount);
+      if(!validBase(pl)||!tlv(pl).some(function(x){ return x[0]==='54'&&x[1]===Number(amount).toFixed(2); })) return;
+      canvas=drawQR(pl,amount,pay); show('amount'); }).catch(function(){});
   };
   var view=$('view'), auth={id:qs('id').toUpperCase(),last4:qs('k')}, timer=null, offset=0;
   try{ var sv=JSON.parse(sessionStorage.getItem('npb_b')||'null'); if(sv&&(!auth.id||sv.id===auth.id)&&!auth.last4){ auth.id=auth.id||sv.id; auth.last4=sv.last4; } }catch(e){}
@@ -192,7 +229,7 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
     btn.onclick=function(){ out.innerHTML=''; if(!fi.files[0]) return out.appendChild(el('div',{class:'msg bad',text:'กรุณาเลือกไฟล์ก่อน'}));
       btn.disabled=true; btn.textContent='กำลังส่ง…';
       readFile(fi.files[0],isSlip).then(function(f){ return api(fnName,auth.id,auth.last4,f); })
-        .then(function(nb){ render(nb, {slip:'ส่งสลิปแล้ว ทีมงานจะตรวจสอบและส่งใบจองให้ทางอีเมล',pay:'ส่งสลิปแล้ว ทีมงานจะตรวจสอบและส่งใบเสร็จให้ทางอีเมล',card:'ได้รับไฟล์การ์ดเชิญแล้ว ขอบคุณค่ะ'}[kind]); })
+        .then(function(nb){ render(nb, {slip:'ส่งสลิปแล้ว ระบบแจ้งทีมงานให้ตรวจสอบทันที เมื่อยืนยันคิวแล้วจะส่งใบจองให้ทางอีเมล',pay:'ส่งสลิปแล้ว ทีมงานจะตรวจสอบและส่งใบเสร็จให้ทางอีเมล',card:'ได้รับไฟล์การ์ดเชิญแล้ว ขอบคุณค่ะ'}[kind]); })
         .catch(function(e){ btn.disabled=false; btn.textContent=label; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); });
     };
     box.appendChild(el('label',{},[el('span',{text:isSlip?'รูปสลิปโอนเงิน':'การ์ดเชิญ (รูปภาพหรือ PDF)'}),fi])); box.appendChild(out); box.appendChild(el('div',{class:'btns'},[btn]));
@@ -204,10 +241,7 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
     if(b.balanceNote) sec.appendChild(el('div',{class:'msg bad',text:'ข้อความจากทีมงาน: '+b.balanceNote}));
     sec.appendChild(el('p',{class:'center sub',text:'ยอดที่ต้องโอน'+(b.dueDate?' ภายใน '+thLong(b.dueDate).replace(/^\S+ที่ /,''):'')}));
     sec.appendChild(el('p',{class:'center big',text:fmt(b.due)+' บาท'}));
-    var qi=el('img',{class:'qr',src:QR,alt:'QR พร้อมเพย์ '+b.pay.bankName}), qh=el('p',{class:'hint center',style:'margin:0 0 8px',text:'สแกน QR แล้วพิมพ์ยอด '+fmt(b.due)+' บาทด้วยตัวเอง'});
-    sec.appendChild(qi); sec.appendChild(qh); amountQR(qi,qh,b.due,b.pay);
-    sec.appendChild(copyRow('ยอดโอน (บาท)',b.due));
-    if(b.pay.bankAccount) sec.appendChild(copyRow(b.pay.bankName+(b.pay.bankAccountName?' · '+b.pay.bankAccountName:''),b.pay.bankAccount));
+    payPanel(sec,b.due,b.pay);
     sec.appendChild(el('h3',{text:'โอนแล้ว แนบสลิปที่นี่'}));
     sec.appendChild(uploader(b,'pay','ส่งสลิป'));
     return sec;
@@ -225,10 +259,7 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
     tick(); timer=setInterval(tick,1000);
     sec.appendChild(el('p',{class:'center sub',text:'ยอดมัดจำที่ต้องโอน'}));
     sec.appendChild(el('p',{class:'center big',text:fmt(b.deposit)+' บาท'}));
-    var qi=el('img',{class:'qr',src:QR,alt:'QR พร้อมเพย์ '+b.pay.bankName}), qh=el('p',{class:'hint center',style:'margin:0 0 8px',text:'สแกน QR แล้วพิมพ์ยอด '+fmt(b.deposit)+' บาทด้วยตัวเอง'});
-    sec.appendChild(qi); sec.appendChild(qh); amountQR(qi,qh,b.deposit,b.pay);
-    sec.appendChild(copyRow('ยอดโอน (บาท)',b.deposit));
-    if(b.pay.bankAccount) sec.appendChild(copyRow(b.pay.bankName+(b.pay.bankAccountName?' · '+b.pay.bankAccountName:''),b.pay.bankAccount));
+    payPanel(sec,b.deposit,b.pay);
     sec.appendChild(el('h3',{text:'โอนแล้ว แนบสลิปที่นี่'}));
     sec.appendChild(uploader(b,'slip','ส่งสลิป'));
     return sec;
