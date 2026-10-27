@@ -405,7 +405,7 @@
         d.overtimeFee?row('ต่อเวลา '+d.overtimeHours+' ชั่วโมง',baht(d.overtimeFee)):null, d.adjust?row(d.adjustNote||'ปรับยอด',(d.adjust<0?'− ':'')+baht(Math.abs(d.adjust))):null,
         row('ยอดรวม',baht(more?d.grand:d.total),'sum'),
         inv&&d.payStatus==='มัดจำแล้ว'?row('หักมัดจำที่ชำระแล้ว','− '+baht(d.deposit)):null,
-        inv?row('ยอดที่ต้องชำระ'+(d.dueDate?' (ภายใน '+thFull(d.dueDate)+')':''),baht(d.due),'due'):row('รับชำระแล้วทั้งหมด',baht(d.grand),'due') ])
+        inv?row('ยอดคงเหลือ',baht(d.due),'due'):row('รับชำระแล้วทั้งหมด',baht(d.grand),'due') ])
     ]);
     if(inv){ n.appendChild(el('div',{class:'pay'},[ qr?el('img',{src:qr,alt:''}):null, el('div',{},[ el('b',{text:'ชำระผ่านพร้อมเพย์ / โอนเข้าบัญชี'}),
         el('p',{text:'สแกน QR ด้วยแอปธนาคาร ยอด '+baht(d.due)+' จะขึ้นให้อัตโนมัติ'}),

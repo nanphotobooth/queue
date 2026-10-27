@@ -287,7 +287,7 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
     var sec=el('section',{class:'noprint'});
     sec.appendChild(el('h2',{text:'ชำระยอดคงเหลือ'}));
     if(b.balanceNote) sec.appendChild(el('div',{class:'msg bad',text:'ข้อความจากทีมงาน: '+b.balanceNote}));
-    sec.appendChild(el('p',{class:'center sub',text:'ยอดที่ต้องโอน'+(b.dueDate?' ภายใน '+thLong(b.dueDate).replace(/^\S+ที่ /,''):'')}));
+    sec.appendChild(el('p',{class:'center sub',text:'ยอดคงเหลือ'}));
     sec.appendChild(el('p',{class:'center big',text:fmt(b.due)+' บาท'}));
     payPanel(sec,b.due,b.pay);
     sec.appendChild(el('h3',{text:'โอนแล้ว แนบสลิปที่นี่'}));
@@ -324,7 +324,7 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
     sec.appendChild(el('h3',{text:'รายละเอียดงาน'})); sec.appendChild(summary(b));
     sec.appendChild(el('h3',{text:'ราคา'})); sec.appendChild(money(b,kind==='invoice'||kind==='receipt'));
     if(isQuote){ var until=created?addDays(created,b.quoteDays):''; sec.appendChild(el('div',{class:'msg info'},['มัดจำเมื่อจอง '+fmt(b.deposit)+' บาท'+(until?' · ใบเสนอราคานี้ใช้ได้ถึง '+thLong(until).replace(/^\S+ที่ /,''):'')+' · ยังไม่ได้กันคิว'])); }
-    else if(kind==='invoice') sec.appendChild(kv([ b.payStatus==='มัดจำแล้ว'?['มัดจำที่ชำระแล้ว','− '+fmt(b.deposit)+' บาท']:null, ['ยอดที่ต้องชำระ'+(b.dueDate?' ภายใน '+short(b.dueDate):''),fmt(b.due)+' บาท','total'] ]));
+    else if(kind==='invoice') sec.appendChild(kv([ b.payStatus==='มัดจำแล้ว'?['มัดจำที่ชำระแล้ว','− '+fmt(b.deposit)+' บาท']:null, ['ยอดคงเหลือ',fmt(b.due)+' บาท','total'] ]));
     else if(kind==='receipt') sec.appendChild(el('div',{class:'msg ok',text:'ได้รับชำระครบแล้ว '+fmt(b.grand)+' บาท'+(b.paidAt?' เมื่อ '+short(b.paidAt.slice(0,10)):'')}));
     else sec.appendChild(kv([['มัดจำที่ชำระแล้ว',fmt(b.deposit)+' บาท'],['ยอดคงเหลือ ชำระภายในวันถัดไปหลังจบงาน',fmt(b.balance)+' บาท','total']]));
     var terms=termsNode(false); if(kind==='quote'||kind==='booking') sec.appendChild(terms);
