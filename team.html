@@ -127,6 +127,7 @@
   .pdoc .pay{display:flex;gap:22px;align-items:center;margin-top:26px;border:1px solid #e4dccd;border-radius:14px;padding:18px} .pdoc .pay img{width:190px;height:190px;object-fit:contain} .pdoc .pay b{font-size:16px;display:block;margin-bottom:4px}
   .pdoc .paid{margin-top:26px;border:2px solid #2f7d4f;color:#2f7d4f;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;font-size:17px} .pdoc .paid b{font-size:20px}
   .pdoc .foot{margin-top:34px;text-align:center;color:#6f675c;font-size:13px}
+  .tplprev{display:grid;grid-template-columns:repeat(4,1fr);gap:6px} .tplprev img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -447,6 +448,37 @@
     return el('fieldset',{},[ el('legend',{text:name+' '+(inv?b.invoiceNo:b.receiptNo)}),
       el('p',{style:'margin:0 0 8px;font-size:14px',text:'ดาวน์โหลดแล้วส่งให้ลูกค้าทางแชทเพจได้เลย'+(inv?' ในไฟล์มี QR พร้อมเพย์ที่ใส่ยอดให้แล้ว':'')+(b.email?'':' · ลูกค้ารายนี้ไม่มีอีเมล ระบบจึงไม่ได้ส่งเอกสารให้ ต้องส่งทางแชทเท่านั้น')}),
       el('div',{class:'actions'},[bt('pdf',name+' PDF'),bt('jpg',name+' JPEG (รูปภาพ)')]), out ]);
+  }
+  /* ---------- ส่งตัวอย่างเทมเพลตให้ลูกค้าทางอีเมล ---------- */
+  function shrinkImage(file){ return new Promise(function(res,rej){
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)) return rej(new Error('เลือกได้เฉพาะไฟล์รูป JPEG หรือ PNG'));
+    var url=URL.createObjectURL(file), im=new Image();
+    im.onerror=function(){ URL.revokeObjectURL(url); rej(new Error('เปิดรูป '+file.name+' ไม่ได้')); };
+    im.onload=function(){ var k=Math.min(1,2000/Math.max(im.width,im.height)), c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k);
+      var g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(url);
+      var d=c.toDataURL('image/jpeg',0.88); res({mime:'image/jpeg',data:d.split(',')[1],preview:d}); };
+    im.src=url; }); }
+  function templateBox(b){
+    var out=el('div'), prev=el('div',{class:'tplprev'}), pics=[];
+    var msg=el('textarea',{maxlength:1000,'aria-label':'ข้อความถึงลูกค้า'}); msg.value='ทีมงาน Nan Photo Booth ส่งตัวอย่างเทมเพลตสำหรับงานของคุณมาให้ดูค่ะ';
+    var fi=el('input',{type:'file',accept:'image/jpeg,image/png',multiple:true,'aria-label':'เลือกรูปเทมเพลต'});
+    fi.onchange=function(){ out.innerHTML=''; prev.innerHTML=''; pics=[]; var fs=[].slice.call(fi.files,0,4);
+      if(fi.files.length>4) out.appendChild(el('div',{class:'msg bad',text:'ส่งได้ครั้งละไม่เกิน 4 รูป ระบบเลือก 4 รูปแรกให้'}));
+      Promise.all(fs.map(shrinkImage)).then(function(r){ pics=r; r.forEach(function(p){ prev.appendChild(el('img',{src:p.preview,alt:''})); }); })
+        .catch(function(e){ out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+    var btn=el('button',{class:'btn primary',type:'button',text:'ส่งให้ลูกค้าทางอีเมล'});
+    btn.onclick=function(){ out.innerHTML='';
+      if(!pics.length) return out.appendChild(el('div',{class:'msg bad',text:'เลือกรูปเทมเพลตก่อน'}));
+      if(!confirm('ส่งตัวอย่างเทมเพลต '+pics.length+' รูป ไปที่ '+b.email+' ใช่ไหม')) return;
+      btn.disabled=true; btn.textContent='กำลังส่ง…';
+      api('adminSendTemplate',S.token,b.id,pics.map(function(p){ return {mime:p.mime,data:p.data}; }),msg.value).then(function(){
+          btn.textContent='ส่งแล้ว'; fi.value=''; pics=[]; prev.innerHTML='';
+          out.appendChild(el('div',{class:'msg ok',text:'ส่งให้ '+b.email+' แล้ว ลูกค้าจะตอบกลับมาที่อีเมลร้าน สถานะงานออกแบบเปลี่ยนเป็น "ส่งแบบให้ลูกค้าดู"'})); refresh(); })
+        .catch(function(e){ btn.disabled=false; btn.textContent='ส่งให้ลูกค้าทางอีเมล'; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+    return el('fieldset',{},[ el('legend',{text:'ส่งตัวอย่างเทมเพลตทางอีเมล'}),
+      b.email?el('p',{style:'margin:0 0 8px;font-size:14px',text:'สำหรับลูกค้าที่ติดต่อทางเพจไม่ได้ ระบบจะส่งรูปไปที่ '+b.email+' ลูกค้าตอบกลับอีเมลเพื่อยืนยันหรือขอแก้แบบได้'})
+        :el('p',{class:'msg bad',style:'margin:0',text:'คิวนี้ยังไม่มีอีเมลลูกค้า ใส่อีเมลในช่อง "อีเมล" ด้านล่างแล้วกดบันทึกก่อน จึงจะส่งได้'}),
+      b.email?el('div',{class:'f'},[ el('label',{class:'full'},[el('span',{text:'รูปเทมเพลต (สูงสุด 4 รูป)'}),fi]), el('div',{class:'full'},[prev]), el('label',{class:'full'},[el('span',{text:'ข้อความถึงลูกค้า'}),msg]), el('div',{class:'full'},[out,btn]) ]):null ]);
   }
   function jobSheet(b){
     var sheet=$('sheet'); sheet.innerHTML=''; sheet.className='sheet js';
@@ -813,6 +845,7 @@
     if(!isNew&&(can('finish')||can('settle'))) sheet.appendChild(docPanel(b));
     if(!isNew) sheet.appendChild(el('div',{class:'actions',style:'margin-bottom:12px'},[el('button',{class:'btn',type:'button',text:'ใบงานหน้างาน',onclick:function(){ jobSheet(b); }}),el('span')]));
     if(!isNew) sheet.appendChild(onlineBox(b));
+    if(!isNew&&can('edit')&&['ยืนยันคิว','รอยืนยัน','รอตรวจมัดจำ','สลิปมีปัญหา'].indexOf(b.status)>=0&&b.service!=='Video Guestbook') sheet.appendChild(templateBox(b));
     sheet.appendChild(el('fieldset',{},[ el('legend',{text:'วันและบริการ'}), el('div',{class:'f'},[
       lab('วันงาน',inp('date','date')), lab('รอบ',sel('slot',L.slots)),
       lab('เวลาเริ่ม',inp('start','time')), lab('เวลาสิ้นสุด',inp('end','time')),
