@@ -112,6 +112,7 @@ footer a{color:inherit}
   .pip{width:14px;height:8px;border-radius:4px;background:var(--free)}
   .pip.P{background:var(--brand)}
   .pip.F,.pip.C{background:#cfc8bb}
+  .pip.T{background:transparent;box-shadow:inset 0 0 0 1.5px #cfc8bb}
   .day.past{color:#b9b2a6;cursor:default}
   .day.past .pips{visibility:hidden}
   .day.today .n{text-decoration:underline;text-underline-offset:4px}
@@ -123,9 +124,9 @@ footer a{color:inherit}
   .detail h3{margin:0 0 10px;font-size:17px;font-weight:600}
   .slot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:8px}
   .slot small{display:block;color:var(--muted);font-size:13px}
-  .slot.A{background:var(--free-bg)} .slot.P{background:var(--pend-bg)} .slot.F,.slot.C{background:var(--full-bg)}
+  .slot.A{background:var(--free-bg)} .slot.P{background:var(--pend-bg)} .slot.F,.slot.C,.slot.T{background:var(--full-bg)}
   .tag{font-weight:600;font-size:14px;white-space:nowrap}
-  .slot.A .tag{color:var(--free)} .slot.P .tag{color:var(--pend)} .slot.F .tag,.slot.C .tag{color:var(--full)}
+  .slot.A .tag{color:var(--free)} .slot.P .tag{color:var(--pend)} .slot.F .tag,.slot.C .tag,.slot.T .tag{color:var(--full)}
   .note{font-size:14px;color:var(--muted);margin:8px 0 0}
   .seg{display:flex;background:var(--full-bg);border-radius:12px;padding:4px;margin:12px 0}
   .seg button{flex:1;border:0;background:transparent;font:inherit;font-weight:500;padding:9px 4px;border-radius:9px;color:var(--muted);cursor:pointer}
@@ -170,7 +171,7 @@ footer a{color:inherit}
     <div class="grid" id="dow"></div>
     <div class="grid" id="days"><div class="loading" style="grid-column:1/-1">กำลังโหลดคิวงาน…</div></div>
     <div class="legend">
-      <span><i class="pip"></i>ว่าง</span><span><i class="pip P"></i>รอยืนยัน</span><span><i class="pip F"></i>เต็ม</span>
+      <span><i class="pip"></i>ว่าง</span><span><i class="pip P"></i>รอยืนยัน</span><span><i class="pip F"></i>เต็ม</span><span><i class="pip T"></i>จองทางแชทเพจ</span>
       <span>ขีดซ้าย = รอบเช้า · ขีดขวา = รอบเย็น</span>
     </div>
     <div class="detail" id="detail" hidden></div>
@@ -210,7 +211,7 @@ footer a{color:inherit}
   var el = function(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; };
   var MONTHS=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   var DOW=['อา','จ','อ','พ','พฤ','ศ','ส'];
-  var LABEL={A:'ว่าง',P:'รอยืนยัน',F:'เต็ม',C:'ปิดรับงาน'};
+  var LABEL={A:'ว่าง',P:'รอยืนยัน',F:'เต็ม',C:'ปิดรับงาน',T:'จองทางแชทเพจ'};
   var init=null, cur=null, cache={}, sel=null, tab='pb';
   var fmt=function(n){ return Number(n).toLocaleString('en-US'); };
   var pad=function(n){ return ('0'+n).slice(-2); };
@@ -247,7 +248,7 @@ footer a{color:inherit}
           var past=iso<init.today;
           if(past){ b.classList.add('past'); b.disabled=true; }
           if(iso===init.today) b.classList.add('today');
-          if(!past && st[0]!=='A' && st[0]!=='P' && st[1]!=='A' && st[1]!=='P') b.classList.add('allfull');
+          if(!past && /[FC]/.test(st[0]) && /[FC]/.test(st[1])) b.classList.add('allfull');
           if(sel===iso) b.classList.add('sel');
           b.setAttribute('aria-label',d+' '+MONTHS[m-1]+' รอบเช้า'+LABEL[st[0]]+' รอบเย็น'+LABEL[st[1]]);
           b.onclick=function(){ sel=iso; render(); showDetail(iso,st); };
@@ -265,14 +266,15 @@ footer a{color:inherit}
       var row=el('div','slot '+r[2]); var left=el('div'); left.appendChild(document.createTextNode(r[0]));
       left.appendChild(el('small',null,String(r[1]).replace('-','–')+' น.')); row.appendChild(left); row.appendChild(el('span','tag',LABEL[r[2]])); box.appendChild(row);
     });
-    var anyFree=st.indexOf('A')>=0, anyPend=st.indexOf('P')>=0, soon=iso<addDays(init.today,init.leadDays);
+    var anyFree=st.indexOf('A')>=0, anyPend=st.indexOf('P')>=0, anyChat=st.indexOf('T')>=0, soon=iso<addDays(init.today,init.leadDays);
     var msg = anyFree ? (soon ? 'วันงานใกล้มาก กรุณาทักแชทเพื่อเช็กกับทีมงานก่อนนะคะ' : (init.holdMinutes ? 'คิวยังว่าง จองออนไลน์และชำระมัดจำได้เลยค่ะ' : 'คิวยังว่าง ทักแชทเพจเพื่อจองคิวได้เลยค่ะ'))
+            : anyChat ? 'วันจันทร์–ศุกร์ รับจองทางแชทเพจ ทักมาเช็กคิวกับทีมงานได้เลยค่ะ'
             : anyPend ? 'มีลูกค้ารอยืนยันคิวอยู่ ทักแชทเพื่อเข้าคิวสำรองได้ค่ะ' : 'วันนี้คิวเต็มแล้ว ลองเลือกวันอื่น หรือทักแชทสอบถามได้ค่ะ';
     box.appendChild(el('p','note',msg));
     var btns=el('div','btns');
     var online=!!init.holdMinutes;
     if(online&&anyFree&&!soon){ var bk=el('a','btn primary','จองคิววันนี้ออนไลน์'); bk.href='book.html?date='+iso+(st[0]==='A'&&st[1]!=='A'?'&slot=เช้า':st[1]==='A'&&st[0]!=='A'?'&slot=เย็น':''); btns.appendChild(bk); }
-    var a=el('a',(online&&anyFree&&!soon)?'btn':'btn primary',(!online&&anyFree)?'จองคิววันนี้ทางแชทเพจ':'สอบถามทางแชทเพจ'); a.href=init.shop.messenger; a.target='_blank'; a.rel='noopener'; btns.appendChild(a);
+    var a=el('a',(online&&anyFree&&!soon)?'btn':'btn primary',((!online&&anyFree)||(!anyFree&&anyChat))?'จองคิววันนี้ทางแชทเพจ':'สอบถามทางแชทเพจ'); a.href=init.shop.messenger; a.target='_blank'; a.rel='noopener'; btns.appendChild(a);
     box.appendChild(btns);
     box.appendChild(el('p','note','โทร '+init.shop.phones));
     box.scrollIntoView({behavior:'smooth',block:'nearest'});

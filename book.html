@@ -243,9 +243,9 @@ var termsNode=function(open){ var d=el('details',open?{open:true}:{},[el('summar
         var st=days[d]||['A','A']; slotSel.innerHTML=''; slotSel.disabled=false;
         slotSel.appendChild(el('option',{value:'',text:'เลือกรอบ'}));
         [['เช้า',init.slots.morning,st[0]],['เย็น',init.slots.evening,st[1]]].forEach(function(r){
-          var free=r[2]==='A', o=el('option',{value:r[0],text:'รอบ'+r[0]+' '+String(r[1]).replace('-','–')+(free?'':' ('+({P:'รอยืนยัน',F:'เต็ม',C:'ปิดรับงาน'}[r[2]])+')')}); if(!free) o.disabled=true; if(free&&F.slot===r[0]) o.selected=true; slotSel.appendChild(o);
+          var free=r[2]==='A', o=el('option',{value:r[0],text:'รอบ'+r[0]+' '+String(r[1]).replace('-','–')+(free?'':' ('+({P:'รอยืนยัน',F:'เต็ม',C:'ปิดรับงาน',T:'จองทางแชทเพจ'}[r[2]])+')')}); if(!free) o.disabled=true; if(free&&F.slot===r[0]) o.selected=true; slotSel.appendChild(o);
         });
-        if(st[0]!=='A'&&st[1]!=='A'){ avail.appendChild(el('div',{class:'msg warn',text:'วันนี้ไม่มีรอบว่าง กรุณาเลือกวันอื่น'})); F.slot=''; }
+        if(st[0]!=='A'&&st[1]!=='A'){ avail.appendChild(st.indexOf('T')>=0 ? el('div',{class:'msg warn'},['วันจันทร์–ศุกร์ รับจองทางแชทเพจ ',el('a',{href:init.shop.messenger,target:'_blank',rel:'noopener',text:'ทักแชทเพจเพื่อเช็กคิว'}),' หรือเลือกวันเสาร์–อาทิตย์']) : el('div',{class:'msg warn',text:'วันนี้ไม่มีรอบว่าง กรุณาเลือกวันอื่น'})); F.slot=''; }
         else if(F.slot&&st[F.slot==='เช้า'?0:1]!=='A') F.slot='';
         drawStart();
       }).catch(function(e){ slotSel.innerHTML=''; avail.appendChild(el('div',{class:'msg bad',text:'เช็กคิวไม่สำเร็จ กรุณาลองใหม่'})); });
