@@ -141,6 +141,11 @@ footer a{color:inherit}
   .loading{color:var(--muted);text-align:center;padding:26px 0}
   .err{background:#fde8e4;color:#8a2c1b;border-radius:12px;padding:12px;font-size:14px}
 </style>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#f6f3ec">
+<link rel="canonical" href="https://nanphotobooth.github.io/queue/queue.html">
 </head>
 <body>
 <div class="topnav" id="topnav"><div class="in">
@@ -300,12 +305,20 @@ footer a{color:inherit}
   $('next').onclick=function(){ cur.m++; if(cur.m>12){cur.m=1;cur.y++;} sel=null; $('detail').hidden=true; render(); };
   [].forEach.call($('seg').children,function(b){ b.onclick=function(){ tab=b.dataset.t; [].forEach.call($('seg').children,function(x){ x.classList.toggle('on',x===b); }); renderPrices(); }; });
 
-  api('publicInit').then(function(r){
-    init=r; cur={y:+r.today.slice(0,4),m:+r.today.slice(5,7)};
+  /* แสดงข้อมูลที่เคยโหลดไว้วันนี้ทันที แล้วโหลดชุดใหม่ (รวมคิวว่าง 2 เดือนแรก) มาแทน */
+  var initFast=function(n,onData,onError){
+    var k='npb_init'+n, today=new Date(Date.now()+7*3600000).toISOString().slice(0,10), c=null, shown=false;
+    try{ c=JSON.parse(localStorage.getItem(k)||'null'); }catch(e){}
+    if(c&&c.today===today){ shown=true; try{ onData(c,true); }catch(e){} }
+    api('publicInit',n).then(function(r){ try{ localStorage.setItem(k,JSON.stringify(r)); }catch(e){} onData(r,false); }).catch(function(e){ if(!shown) onError(e); });
+  };
+  initFast(2,function(r,cached){
+    var first=!init; init=r; Object.keys(r.months||{}).forEach(function(ym){ cache[ym]=r.months[ym]; });
+    if(first) cur={y:+r.today.slice(0,4),m:+r.today.slice(5,7)};
     render(); renderPrices(); if(r.holdMinutes) $('foot2').hidden=false;
     var f=$('foot'); f.textContent='';
     [['Facebook',r.shop.facebook],['Instagram',r.shop.instagram]].forEach(function(l,i){ if(!l[1]) return; if(i) f.appendChild(document.createTextNode(' · ')); var a=el('a',null,l[0]); a.href=l[1]; a.target='_blank'; a.rel='noopener'; f.appendChild(a); });
-  }).catch(function(e){
+  },function(e){
     $('days').innerHTML=''; var x=el('div','err','เปิดระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'); x.style.gridColumn='1/-1'; $('days').appendChild(x); $('prices').innerHTML='';
   });
 })();

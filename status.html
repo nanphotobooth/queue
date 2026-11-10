@@ -102,6 +102,11 @@ footer a{color:inherit}
 .doc .no{display:flex;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:8px}
 @media print{ .doc details{border:0} .doc details>summary{display:none} .doc details ol{color:#000} }
 </style>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#f6f3ec">
+<meta name="robots" content="noindex">
 </head>
 <body>
 <div class="topnav" id="topnav"><div class="in">
@@ -134,6 +139,14 @@ var api=function(fn){
   return fetch(API_URL,{method:'POST',credentials:'omit',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})})
     .then(function(r){ if(!r.ok) throw new Error('เชื่อมต่อระบบไม่สำเร็จ ('+r.status+')'); return r.json(); })
     .then(function(j){ if(!j.ok) throw new Error(j.error); return j.data; });
+};
+/* แสดงข้อมูลชุดล่าสุดที่เคยโหลดทันที (ถ้าเป็นของวันนี้) แล้วโหลดชุดใหม่ตามมา  onData(data, isCached) */
+var initFast=function(n,onData,onError){
+  var k='npb_init'+n, today=new Date(Date.now()+7*3600000).toISOString().slice(0,10), c=null, shown=false;
+  try{ c=JSON.parse(localStorage.getItem(k)||'null'); }catch(e){}
+  if(c&&c.today===today){ shown=true; try{ onData(c,true); }catch(e){} }
+  api('publicInit',n).then(function(r){ try{ localStorage.setItem(k,JSON.stringify(r)); }catch(e){} onData(r,false); })
+    .catch(function(e){ if(!shown) onError(e); });
 };
 var $=function(id){ return document.getElementById(id); };
 var el=function(tag,attrs,kids){ var e=document.createElement(tag); attrs=attrs||{}; Object.keys(attrs).forEach(function(k){ if(k==='text') e.textContent=attrs[k]; else if(k==='class') e.className=attrs[k]; else if(k.slice(0,2)==='on') e[k]=attrs[k]; else if(attrs[k]!==false&&attrs[k]!=null) e.setAttribute(k,attrs[k]===true?'':attrs[k]); }); (kids||[]).forEach(function(c){ if(c!=null&&c!==false) e.appendChild(typeof c==='string'?document.createTextNode(c):c); }); return e; };
