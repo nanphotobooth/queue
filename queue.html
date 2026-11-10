@@ -315,7 +315,7 @@ footer a{color:inherit}
   initFast(2,function(r,cached){
     var first=!init; init=r; Object.keys(r.months||{}).forEach(function(ym){ cache[ym]=r.months[ym]; });
     if(first) cur={y:+r.today.slice(0,4),m:+r.today.slice(5,7)};
-    render(); renderPrices(); if(r.holdMinutes) $('foot2').hidden=false;
+    render(); renderPrices(); if(r.holdMinutes&&$('foot2')) $('foot2').hidden=false;
     var f=$('foot'); f.textContent='';
     [['Facebook',r.shop.facebook],['Instagram',r.shop.instagram]].forEach(function(l,i){ if(!l[1]) return; if(i) f.appendChild(document.createTextNode(' · ')); var a=el('a',null,l[0]); a.href=l[1]; a.target='_blank'; a.rel='noopener'; f.appendChild(a); });
   },function(e){
