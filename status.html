@@ -107,6 +107,15 @@ footer a{color:inherit}
 .doc .sign .ln{border-top:1px dotted #8a8170;padding-top:6px}
 .doc .billto{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 6px}
 .doc .billto b{display:block}
+.qf .qh{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid var(--ink,#1f1b16);padding-bottom:12px;margin-bottom:12px;font-size:13px;color:var(--muted)}
+.qf .qh .qs b{display:block;font-size:15px;color:var(--ink,#1f1b16)} .qf .qh .qt{text-align:right;white-space:nowrap} .qf .qh .qt h2{margin:0} .qf .qh .qt .sub{letter-spacing:.25em;font-size:11px}
+.qf .qc{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:14px} .qf .qc>div{border:1px solid var(--line);border-radius:10px;padding:8px 10px} .qf .qc h3{margin:0 0 4px;font-size:13px;color:var(--muted)}
+.qf .qwrap{overflow-x:auto} .qf .qi{width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px} .qf .qi th{background:#1f1b16;color:#fff;font-weight:500;padding:6px;font-size:12.5px} .qf .qi td{border:1px solid var(--line);padding:6px;vertical-align:top}
+.qf .qi td.c{text-align:center} .qf .qi td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums} .qf .qi .sub{font-size:12px;color:var(--muted)} .qf .qi tr.grand td{font-weight:700;background:#fbf3df} .qf .qi td.words span{display:block;font-size:11.5px;color:var(--muted)}
+.qf .qn{font-size:13.5px;margin-top:12px} .qf .qn ol{margin:4px 0 0;padding-left:20px}
+.qf .sign{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px;font-size:13.5px;text-align:center;line-height:1.9}
+@media (max-width:520px){ .qf .qh{flex-direction:column} .qf .qh .qt{text-align:left} .qf .qc{grid-template-columns:1fr} }
+@media print{ .qf .qi{min-width:0} }
 @media print{ .doc details{border:0} .doc details>summary{display:none} .doc details ol{color:#000} }
 </style>
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
@@ -343,7 +352,37 @@ var bahtText=function(n){
     sec.appendChild(uploader(b,'slip','ส่งสลิป'));
     return sec;
   }
+  /* ใบเสนอราคาแบบฟอร์มมาตรฐาน (ตารางรายการ) */
+  function quoteBox(b){
+    var sec=el('section',{class:'doc qf'}), org=!!(b.bill&&b.bill.name), wr=b.whtRate||0, base=+b.total||0, wht=wr?Math.round(base*wr)/100:0, s=b.seller;
+    var m2=function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+    var when=String(b.quoteAt||b.created||'').slice(0,10), until=/^\d{4}-\d{2}-\d{2}$/.test(when)?addDays(when,b.quoteDays):'', short=function(iso){ return thLong(iso).replace(/^\S+ที่ /,''); };
+    sec.appendChild(el('div',{class:'qh'},[
+      el('div',{class:'qs'},[ el('b',{text:s.person?s.person:s.name}), s.person?el('div',{text:'ชื่อทางการค้า '+s.name+' (บุคคลธรรมดา)'}):null, el('div',{text:s.address}), el('div',{text:'โทร '+s.phones}), s.taxId?el('div',{text:'เลขประจำตัวผู้เสียภาษี '+s.taxId}):null ]),
+      el('div',{class:'qt'},[ el('h2',{text:'ใบเสนอราคา'}), el('div',{class:'sub',text:'QUOTATION'}), el('div',{text:'เลขที่ '+(b.quoteNo||b.id)}), /^\d{4}-\d{2}-\d{2}$/.test(when)?el('div',{text:'วันที่ '+short(when)}):null, until?el('div',{text:'ยืนราคาถึง '+short(until)}):null ]) ]));
+    var cust=org?[b.bill.name+(b.bill.branch?' ('+b.bill.branch+')':''), b.bill.address, b.bill.taxId?'เลขประจำตัวผู้เสียภาษี '+b.bill.taxId:'', 'ผู้ติดต่อ '+b.customer]:[b.customer, b.host?'เจ้าของงาน '+b.host:''];
+    sec.appendChild(el('div',{class:'qc'},[
+      el('div',{},[el('h3',{text:'ลูกค้า'})].concat(cust.filter(String).map(function(x,i){ return el('div',{style:(i===0?'font-weight:600;':'')+'white-space:pre-line',text:x}); }))),
+      el('div',{},[el('h3',{text:'รายละเอียดงาน'}), el('div',{text:'วันงาน '+thLong(b.date)}), el('div',{text:'เวลา รอบ'+b.slot+(b.start?' '+b.start+'–'+b.end+' น.':'')}), el('div',{text:'สถานที่ '+(b.venue||'–')}), b.eventType?el('div',{text:'ประเภทงาน '+b.eventType}):null]) ]));
+    var hasPb=b.service!=='Video Guestbook', it=[];
+    it.push({n:'บริการ '+b.service+' '+b.hours+' ชั่วโมง',s:[hasPb&&b.print&&b.print!=='-'?(b.print==='ไม่พิมพ์'?'ไม่พิมพ์ภาพ (รับไฟล์ดิจิทัล)':'พิมพ์ภาพ '+b.print+' นิ้ว'):'', b.backdrop?'ฉาก '+b.backdrop:''].filter(String).join(' · '),u:'งาน',p:+b.price||0});
+    if(+b.extra) it.push({n:'บริการเขียนคำอวยพร',s:'',u:'งาน',p:+b.extra});
+    if(+b.travel) it.push({n:'ค่าเดินทาง',s:b.area||'',u:'เที่ยว',p:+b.travel});
+    var diff=Math.round((base-it.reduce(function(a,x){ return a+x.p; },0))*100)/100; if(diff) it.push({n:diff<0?'ส่วนลด':'ค่าบริการอื่น',s:'',u:'รายการ',p:diff});
+    var QW=['7%','45%','9%','9%','15%','15%'], rows=[el('tr',{},['ลำดับ','รายการ','จำนวน','หน่วย','ราคาต่อหน่วย','จำนวนเงิน'].map(function(h,i){ return el('th',{text:h,style:'width:'+QW[i]}); }))];
+    it.forEach(function(x,i){ rows.push(el('tr',{},[ el('td',{class:'c',text:String(i+1)}), el('td',{},[el('div',{text:x.n}),x.s?el('div',{class:'sub',text:x.s}):null]), el('td',{class:'c',text:'1'}), el('td',{class:'c',text:x.u}), el('td',{class:'r',text:m2(x.p)}), el('td',{class:'r',text:m2(x.p)}) ])); });
+    var tot=[['รวมเป็นเงิน',m2(base)]]; if(wht){ tot.push(['หักภาษี ณ ที่จ่าย '+wr+'%','− '+m2(wht)]); tot.push(['ยอดชำระสุทธิ',m2(base-wht)]); } else tot.push(['จำนวนเงินรวมทั้งสิ้น',m2(base)]);
+    tot.forEach(function(r,i){ rows.push(el('tr',{class:'tot'+(i===tot.length-1?' grand':'')},[ i===0?el('td',{colspan:'4',rowspan:String(tot.length),class:'words'},[el('span',{text:'จำนวนเงิน (ตัวอักษร)'}),el('b',{text:bahtText(wht?base-wht:base)})]):null, el('td',{class:'r',text:r[0]}), el('td',{class:'r',text:r[1]}) ].filter(Boolean))); });
+    sec.appendChild(el('div',{class:'qwrap'},[el('table',{class:'qi'},rows)]));
+    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'', b.quoteTerms||'', b.docNote||'', s.vatNote||'', b.status==='ใบเสนอราคา'?'ใบเสนอราคานี้ยังไม่ได้กันคิว':'' ].filter(String);
+    if(terms.length) sec.appendChild(el('div',{class:'qn'},[el('b',{text:'เงื่อนไขและหมายเหตุ'}),el('ol',{},terms.map(function(x){ return el('li',{text:x}); }))]));
+    var sg=function(t1,name){ return el('div',{},[el('div',{text:'ลงชื่อ ......................................'}),el('div',{text:'('+(name||'......................................')+')'}),el('div',{text:t1}),el('div',{text:'วันที่ ......./......./.......'})]); };
+    sec.appendChild(el('div',{class:'sign'},[ sg('ผู้เสนอราคา',s.signer), sg('ผู้อนุมัติสั่งซื้อ / สั่งจ้าง','') ]));
+    sec.appendChild(el('div',{class:'btns noprint'},[el('button',{class:'btn',type:'button',text:'พิมพ์ หรือบันทึกเป็น PDF',onclick:function(){ window.print(); }})]));
+    return sec;
+  }
   function docBox(b,kind){
+    if(kind==='quote') return quoteBox(b);
     var isQuote=kind==='quote', sec=el('section',{class:'doc'}), org=!!(b.bill&&b.bill.name), wr=b.whtRate||0;
     sec.appendChild(el('h2',{text:{quote:'ใบเสนอราคา',booking:'ใบจอง',invoice:org?'ใบแจ้งหนี้ / ใบส่งมอบงาน':'ใบแจ้งชำระ',receipt:'ใบเสร็จรับเงิน'}[kind]}));
     var sl=b.seller; sec.appendChild(el('p',{class:'seller',text:(sl.person?['ผู้ให้บริการ '+sl.person+' (บุคคลธรรมดา) ชื่อทางการค้า '+sl.name]:[sl.name]).concat([sl.address,'โทร '+sl.phones,sl.taxId?'เลขประจำตัวผู้เสียภาษี (เลขประจำตัวประชาชน) '+sl.taxId:'']).filter(String).join(' · ')}));
