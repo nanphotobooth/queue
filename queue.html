@@ -274,6 +274,7 @@ footer a{color:inherit}
     var btns=el('div','btns');
     var online=!!init.holdMinutes;
     if(online&&anyFree&&!soon){ var bk=el('a','btn primary','จองคิววันนี้ออนไลน์'); bk.href='book.html?date='+iso+(st[0]==='A'&&st[1]!=='A'?'&slot=เช้า':st[1]==='A'&&st[0]!=='A'?'&slot=เย็น':''); btns.appendChild(bk); }
+    if(anyChat&&!anyFree&&!soon){ var qb=el('a','btn','ขอใบเสนอราคาออนไลน์'); qb.href='book.html?quote=1&date='+iso; btns.appendChild(qb); }
     var a=el('a',(online&&anyFree&&!soon)?'btn':'btn primary',((!online&&anyFree)||(!anyFree&&anyChat))?'จองคิววันนี้ทางแชทเพจ':'สอบถามทางแชทเพจ'); a.href=init.shop.messenger; a.target='_blank'; a.rel='noopener'; btns.appendChild(a);
     box.appendChild(btns);
     box.appendChild(el('p','note','โทร '+init.shop.phones));
