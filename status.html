@@ -111,7 +111,8 @@ footer a{color:inherit}
 .qf .qh .qs b{display:block;font-size:15px;color:var(--ink,#1f1b16)} .qf .qh .qt{text-align:right;white-space:nowrap} .qf .qh .qt h2{margin:0} .qf .qh .qt .sub{letter-spacing:.25em;font-size:11px}
 .qf .qc{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;font-size:14px} .qf .qc>div{border:1px solid var(--line);border-radius:10px;padding:8px 10px} .qf .qc h3{margin:0 0 4px;font-size:13px;color:var(--muted)}
 .qf .qwrap{overflow-x:auto} .qf .qi{width:100%;border-collapse:collapse;font-size:13.5px;min-width:520px} .qf .qi th{background:#1f1b16;color:#fff;font-weight:500;padding:6px;font-size:12.5px} .qf .qi td{border:1px solid var(--line);padding:6px;vertical-align:top}
-.qf .qi td.c{text-align:center} .qf .qi td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums} .qf .qi .sub{font-size:12px;color:var(--muted);white-space:pre-line;line-height:1.5} .qf .qc.one{grid-template-columns:1fr} .qf .qi tr.grand td{font-weight:700;background:#fbf3df} .qf .qi td.words span{display:block;font-size:11.5px;color:var(--muted)}
+.qf .qi td.c{text-align:center} .qf .qi td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums} .qf .qi .sub{font-size:12px;color:var(--muted);white-space:pre-line;line-height:1.5} .qf .qc.one{grid-template-columns:1fr}
+.qf .qi table.det{border-collapse:collapse;margin-top:3px} .qf .qi table.det td{border:0;padding:1px 0;font-size:12px;color:var(--muted);vertical-align:top} .qf .qi table.det td:first-child{padding-right:10px;white-space:nowrap} .qf .qi tr.grand td{font-weight:700;background:#fbf3df} .qf .qi td.words span{display:block;font-size:11.5px;color:var(--muted)}
 .qf .qn{font-size:13.5px;margin-top:12px} .qf .qn ol{margin:4px 0 0;padding-left:20px}
 .qf .sign{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px;font-size:13.5px;text-align:center;line-height:1.9}
 @media (max-width:520px){ .qf .qh{flex-direction:column} .qf .qh .qt{text-align:left} .qf .qc{grid-template-columns:1fr} }
@@ -360,21 +361,24 @@ var bahtText=function(n){
     sec.appendChild(el('div',{class:'qh'},[
       el('div',{class:'qs'},[ el('b',{text:s.person?s.person:s.name}), s.person?el('div',{text:'ชื่อทางการค้า '+s.name+' (บุคคลธรรมดา)'}):null, el('div',{text:s.address}), el('div',{text:'โทร '+(function(a){ return a.filter(function(x){ return /เติ้ล/.test(x); })[0]||a[0]||''; })(String(s.phones||'').split(/\s*,\s*/).filter(String))}), s.taxId?el('div',{text:'เลขประจำตัวผู้เสียภาษี '+s.taxId}):null ]),
       el('div',{class:'qt'},[ el('h2',{text:'ใบเสนอราคา'}), el('div',{class:'sub',text:'QUOTATION'}), el('div',{text:'เลขที่ '+(b.quoteNo||b.id)}), /^\d{4}-\d{2}-\d{2}$/.test(when)?el('div',{text:'วันที่ '+short(when)}):null, until?el('div',{text:'ยืนราคาถึง '+short(until)}):null ]) ]));
-    var cust=org?[b.bill.name+(b.bill.branch?' ('+b.bill.branch+')':''), b.bill.address, b.bill.taxId?'เลขประจำตัวผู้เสียภาษี '+b.bill.taxId:'', 'ผู้ติดต่อ '+b.customer]:[b.customer, b.host?'เจ้าของงาน '+b.host:''];
+    var tp=String(b.phone||'').replace(/\D/g,''), tel=tp.length===10?tp.slice(0,3)+'-'+tp.slice(3,6)+'-'+tp.slice(6):tp;
+    var cust=org?[b.bill.name+(b.bill.branch?' ('+b.bill.branch+')':''), b.bill.address, b.bill.taxId?'เลขประจำตัวผู้เสียภาษี '+b.bill.taxId:'', 'ผู้ติดต่อ '+b.customer+(tel?' · โทร '+tel:'')]:[b.customer, tel?'โทร '+tel:'', b.host?'เจ้าของงาน '+b.host:''];
     sec.appendChild(el('div',{class:'qc one'},[
       el('div',{},[el('h3',{text:'ลูกค้า'})].concat(cust.filter(String).map(function(x,i){ return el('div',{style:(i===0?'font-weight:600;':'')+'white-space:pre-line',text:x}); }))) ]));
     var hasPb=b.service!=='Video Guestbook', it=[];
-    it.push({n:'บริการ '+b.service+' '+b.hours+' ชั่วโมง',s:[ 'วันงาน '+thLong(b.date)+' · รอบ'+b.slot+(b.start?' '+b.start+'–'+b.end+' น.':''), 'สถานที่ '+(b.venue||'–'),
-      [hasPb&&b.print&&b.print!=='-'?(b.print==='ไม่พิมพ์'?'ไม่พิมพ์ภาพ (รับไฟล์ดิจิทัล)':'พิมพ์ภาพ '+b.print+' นิ้ว'):'', b.backdrop?'ฉาก '+b.backdrop:''].filter(String).join(' · ') ].filter(String).join('\n'),u:'งาน',p:+b.price||0});
+    var fx=[hasPb&&b.print&&b.print!=='-'?(b.print==='ไม่พิมพ์'?'ไม่พิมพ์ภาพ (รับไฟล์ดิจิทัล)':'พิมพ์ภาพ '+b.print+' นิ้ว'):'', b.backdrop?'ฉาก '+b.backdrop:''].filter(String).join(' · ');
+    it.push({n:'บริการ '+b.service+' '+b.hours+' ชั่วโมง',s:'',det:[['วันงาน',short(b.date)],['เวลา','รอบ'+b.slot+(b.start?' '+b.start+'–'+b.end+' น.':'')],['สถานที่',b.venue||'–'],fx?['รูปแบบ',fx]:null].filter(Boolean),u:'งาน',p:+b.price||0});
     if(+b.extra) it.push({n:'บริการเขียนคำอวยพร',s:'',u:'งาน',p:+b.extra});
     if(+b.travel) it.push({n:'ค่าเดินทาง',s:b.area||'',u:'เที่ยว',p:+b.travel});
     var diff=Math.round((base-it.reduce(function(a,x){ return a+x.p; },0))*100)/100; if(diff) it.push({n:diff<0?'ส่วนลด':'ค่าบริการอื่น',s:'',u:'รายการ',p:diff});
     var QW=['7%','45%','9%','9%','15%','15%'], rows=[el('tr',{},['ลำดับ','รายการ','จำนวน','หน่วย','ราคาต่อหน่วย','จำนวนเงิน'].map(function(h,i){ return el('th',{text:h,style:'width:'+QW[i]}); }))];
-    it.forEach(function(x,i){ rows.push(el('tr',{},[ el('td',{class:'c',text:String(i+1)}), el('td',{},[el('div',{text:x.n}),x.s?el('div',{class:'sub',text:x.s}):null]), el('td',{class:'c',text:'1'}), el('td',{class:'c',text:x.u}), el('td',{class:'r',text:m2(x.p)}), el('td',{class:'r',text:m2(x.p)}) ])); });
+    it.forEach(function(x,i){ rows.push(el('tr',{},[ el('td',{class:'c',text:String(i+1)}), el('td',{},[el('div',{text:x.n}),x.s?el('div',{class:'sub',text:x.s}):null,x.det?el('table',{class:'det'},x.det.map(function(r){ return el('tr',{},[el('td',{text:r[0]}),el('td',{text:r[1]})]); })):null]), el('td',{class:'c',text:'1'}), el('td',{class:'c',text:x.u}), el('td',{class:'r',text:m2(x.p)}), el('td',{class:'r',text:m2(x.p)}) ])); });
     var tot=[['รวมเป็นเงิน',m2(base)]]; if(wht){ tot.push(['หักภาษี ณ ที่จ่าย '+wr+'%','− '+m2(wht)]); tot.push(['ยอดชำระสุทธิ',m2(base-wht)]); } else tot.push(['จำนวนเงินรวมทั้งสิ้น',m2(base)]);
     tot.forEach(function(r,i){ rows.push(el('tr',{class:'tot'+(i===tot.length-1?' grand':'')},[ i===0?el('td',{colspan:'4',rowspan:String(tot.length),class:'words'},[el('span',{text:'จำนวนเงิน (ตัวอักษร)'}),el('b',{text:bahtText(wht?base-wht:base)})]):null, el('td',{class:'r',text:r[0]}), el('td',{class:'r',text:r[1]}) ].filter(Boolean))); });
     sec.appendChild(el('div',{class:'qwrap'},[el('table',{class:'qi'},rows)]));
-    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'', b.quoteTerms||'', b.docNote||'', s.vatNote||'', b.status==='ใบเสนอราคา'?'ใบเสนอราคานี้ยังไม่ได้กันคิว':'' ].filter(String);
+    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'ชำระเต็มจำนวนหลังจบงาน',
+      'ร้านกันคิวให้เมื่อยืนยันการจ้างแล้ว ('+(b.deposit?'ชำระมัดจำ หรือส่งใบสั่งจ้าง/ใบสั่งซื้อ':'ส่งใบสั่งจ้าง/ใบสั่งซื้อ หรือยืนยันเป็นลายลักษณ์อักษร')+')',
+      s.vatNote||'', b.quoteTerms||'', b.docNote||'' ].filter(String);
     if(terms.length) sec.appendChild(el('div',{class:'qn'},[el('b',{text:'เงื่อนไขและหมายเหตุ'}),el('ol',{},terms.map(function(x){ return el('li',{text:x}); }))]));
     var sg=function(t1,name){ return el('div',{},[el('div',{text:'ลงชื่อ ......................................'}),el('div',{text:'('+(name||'......................................')+')'}),el('div',{text:t1}),el('div',{text:'วันที่ ......./......./.......'})]); };
     sec.appendChild(el('div',{class:'sign'},[ sg('ผู้เสนอราคา',s.signer), sg('ผู้อนุมัติสั่งซื้อ / สั่งจ้าง','') ]));

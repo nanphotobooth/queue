@@ -137,7 +137,8 @@
   .pdoc.qf .qt table{margin:8px 0 0 auto;width:auto;font-size:13.5px} .pdoc.qf .qt td{border:0;padding:1px 0 1px 12px;width:auto} .pdoc.qf .qt td:first-child{color:#6f675c}
   .pdoc.qf .qc{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;margin:16px 0} .pdoc.qf .qc>div{border:1px solid #e4dccd;border-radius:10px;padding:10px 14px;font-size:13.5px;line-height:1.55} .pdoc.qf .qc .big{font-size:16px;font-weight:600}
   .pdoc.qf .qi{width:100%;border-collapse:collapse;font-size:14px} .pdoc.qf .qi th{background:#1f1b16;color:#fff;font-weight:500;padding:7px 8px;font-size:13px} .pdoc.qf .qi td{border:1px solid #e4dccd;padding:7px 8px;vertical-align:top;width:auto;color:#1f1b16}
-  .pdoc.qf .qi td.c{text-align:center} .pdoc.qf .qi td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums} .pdoc.qf .qi .sub{font-size:12.5px;color:#6f675c;white-space:pre-line;line-height:1.5} .pdoc.qf .qc.one{grid-template-columns:1fr} .pdoc.qf .qi tr.blank td{height:26px}
+  .pdoc.qf .qi td.c{text-align:center} .pdoc.qf .qi td.r{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums} .pdoc.qf .qi .sub{font-size:12.5px;color:#6f675c;white-space:pre-line;line-height:1.5} .pdoc.qf .qc.one{grid-template-columns:1fr}
+  .pdoc.qf .qi table.det{border-collapse:collapse;margin-top:3px;width:auto} .pdoc.qf .qi table.det td{border:0;padding:1px 0;font-size:12.5px;color:#4a443b;vertical-align:top} .pdoc.qf .qi table.det td:first-child{color:#8a7a5c;padding-right:12px;white-space:nowrap;width:58px} .pdoc.qf .qi tr.blank td{height:26px}
   .pdoc.qf .qi tr.tot td.lb{color:#4a443b} .pdoc.qf .qi tr.grand td{font-weight:700;background:#fbf3df} .pdoc.qf .qi td.words{vertical-align:middle} .pdoc.qf .qi td.words span{display:block;font-size:12px;color:#6f675c} .pdoc.qf .qi td.words b{font-weight:600}
   .pdoc.qf .qn{margin-top:16px;font-size:13.5px} .pdoc.qf .qn ol{margin:4px 0 0;padding-left:20px} .pdoc.qf .qn li{margin:2px 0}
   .pdoc.qf .sign{margin-top:34px} .pdoc.qf .sign>div{padding-top:24px;line-height:1.9}
@@ -428,9 +429,9 @@
   /* ---------- ใบเสนอราคาแบบฟอร์มมาตรฐาน: ตารางรายการ ลำดับ/รายการ/จำนวน/หน่วย/ราคาต่อหน่วย/จำนวนเงิน ---------- */
   var quoteItems=function(d){
     var it=[], hasPb=d.service!=='Video Guestbook';
-    var sub=[ 'วันงาน '+thFull(d.date)+' · รอบ'+d.slot+(d.start?' '+d.start+'–'+d.end+' น.':''), 'สถานที่ '+(d.venue||'–'),
-      [hasPb&&d.print&&d.print!=='-'?(d.print==='ไม่พิมพ์'?'ไม่พิมพ์ภาพ (รับไฟล์ดิจิทัล)':'พิมพ์ภาพ '+d.print+' นิ้ว'):'', d.backdrop?'ฉาก '+d.backdrop:''].filter(String).join(' · ') ].filter(String).join('\n');
-    it.push({n:'บริการ '+d.service+' '+d.hours+' ชั่วโมง',s:sub,q:1,u:'งาน',p:+d.price||0});
+    var fmtx=[hasPb&&d.print&&d.print!=='-'?(d.print==='ไม่พิมพ์'?'ไม่พิมพ์ภาพ (รับไฟล์ดิจิทัล)':'พิมพ์ภาพ '+d.print+' นิ้ว'):'', d.backdrop?'ฉาก '+d.backdrop:''].filter(String).join(' · ');
+    var det=[['วันงาน',thFull(d.date)],['เวลา','รอบ'+d.slot+(d.start?' '+d.start+'–'+d.end+' น.':'')],['สถานที่',d.venue||'–'],fmtx?['รูปแบบ',fmtx]:null].filter(Boolean);
+    it.push({n:'บริการ '+d.service+' '+d.hours+' ชั่วโมง',s:'',det:det,q:1,u:'งาน',p:+d.price||0});
     if(+d.extra) it.push({n:'บริการเขียนคำอวยพร',s:'',q:1,u:'งาน',p:+d.extra});
     if(+d.travel) it.push({n:'ค่าเดินทาง',s:d.area||'',q:1,u:'เที่ยว',p:+d.travel});
     var sum=it.reduce(function(a,x){ return a+x.p; },0), diff=Math.round(((+d.total||0)-sum)*100)/100;
@@ -439,17 +440,23 @@
   };
   /* ใบเสนอราคาแสดงเบอร์ติดต่อเดียว (คุณเติ้ล) ถ้าไม่พบใช้เบอร์แรก */
   var quotePhone=function(p){ var a=String(p||'').split(/\s*,\s*/).filter(String); return a.filter(function(x){ return /เติ้ล/.test(x); })[0]||a[0]||''; };
+  var telFmt=function(p){ p=String(p||'').replace(/\D/g,''); return p.length===10?p.slice(0,3)+'-'+p.slice(3,6)+'-'+p.slice(6):p.length===9?p.slice(0,2)+'-'+p.slice(2,5)+'-'+p.slice(5):p; };
+  /* เงื่อนไขท้ายใบเสนอราคา: เฉพาะที่จำเป็น ไม่ซ้ำกับหัวเอกสาร (วันยืนราคาอยู่ที่หัวแล้ว) */
+  var quoteTerms=function(d,money){ return [
+    d.deposit?'ชำระมัดจำ '+money(d.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'ชำระเต็มจำนวนหลังจบงาน',
+    'ร้านกันคิวให้เมื่อยืนยันการจ้างแล้ว ('+(d.deposit?'ชำระมัดจำ หรือส่งใบสั่งจ้าง/ใบสั่งซื้อ':'ส่งใบสั่งจ้าง/ใบสั่งซื้อ หรือยืนยันเป็นลายลักษณ์อักษร')+')',
+    d.seller.vatNote||'', d.quoteTerms||'', d.docNote||'' ].filter(String); };
   function quoteNode(d){
     var org=!!(d.bill&&d.bill.name), wr=d.whtRate||0, base=+d.total||0, wht=wr?Math.round(base*wr)/100:0, s=d.seller;
     var when=String(d.quoteAt||'').slice(0,10), until=when?(function(){ var p=when.split('-'); return new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+(d.quoteDays||7))).toISOString().slice(0,10); })():'';
     var money=function(n){ return Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); };
     var W=['7%','45%','9%','9%','15%','15%'], items=quoteItems(d), body=[el('tr',{},['ลำดับ','รายการ','จำนวน','หน่วย','ราคาต่อหน่วย','จำนวนเงิน'].map(function(h,i){ return el('th',{text:h,style:'width:'+W[i]}); }))];
-    items.forEach(function(x,i){ body.push(el('tr',{},[ el('td',{class:'c',text:String(i+1)}), el('td',{},[el('div',{text:x.n}),x.s?el('div',{class:'sub',text:x.s}):null]), el('td',{class:'c',text:String(x.q)}), el('td',{class:'c',text:x.u}), el('td',{class:'r',text:money(x.p)}), el('td',{class:'r',text:money(x.p*x.q)}) ])); });
+    items.forEach(function(x,i){ body.push(el('tr',{},[ el('td',{class:'c',text:String(i+1)}), el('td',{},[el('div',{text:x.n}),x.s?el('div',{class:'sub',text:x.s}):null,x.det?el('table',{class:'det'},x.det.map(function(r){ return el('tr',{},[el('td',{text:r[0]}),el('td',{text:r[1]})]); })):null]), el('td',{class:'c',text:String(x.q)}), el('td',{class:'c',text:x.u}), el('td',{class:'r',text:money(x.p)}), el('td',{class:'r',text:money(x.p*x.q)}) ])); });
     for(var k=items.length;k<4;k++) body.push(el('tr',{class:'blank'},[0,1,2,3,4,5].map(function(){ return el('td',{text:' '}); })));
     var tot=[['รวมเป็นเงิน',money(base)]]; if(wht){ tot.push(['หักภาษี ณ ที่จ่าย '+wr+'%','− '+money(wht)]); tot.push(['ยอดชำระสุทธิ',money(base-wht)]); } else tot.push(['จำนวนเงินรวมทั้งสิ้น',money(base)]);
     tot.forEach(function(r,i){ body.push(el('tr',{class:'tot'+(i===tot.length-1?' grand':'')},[ i===0?el('td',{colspan:'4',rowspan:String(tot.length),class:'words'},[el('span',{text:'จำนวนเงิน (ตัวอักษร)'}),el('b',{text:bahtText(wht?base-wht:base)})]):null, el('td',{class:'r lb',text:r[0]}), el('td',{class:'r',text:r[1]}) ].filter(Boolean))); });
-    var cust=org?[d.bill.name+(d.bill.branch?' ('+d.bill.branch+')':''), d.bill.address, d.bill.taxId?'เลขประจำตัวผู้เสียภาษี '+d.bill.taxId:'', 'ผู้ติดต่อ '+d.customer]:[d.customer, d.host?'เจ้าของงาน '+d.host:''];
-    var terms=[ d.deposit?'ชำระมัดจำ '+money(d.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'', d.quoteTerms||'', d.docNote||'', s.vatNote||'' ].filter(String);
+    var tel=telFmt(d.phone), cust=org?[d.bill.name+(d.bill.branch?' ('+d.bill.branch+')':''), d.bill.address, d.bill.taxId?'เลขประจำตัวผู้เสียภาษี '+d.bill.taxId:'', 'ผู้ติดต่อ '+d.customer+(tel?' · โทร '+tel:'')]:[d.customer, tel?'โทร '+tel:'', d.host?'เจ้าของงาน '+d.host:''];
+    var terms=quoteTerms(d,money);
     var sg=function(t1,name){ return el('div',{},[el('div',{text:'ลงชื่อ ................................................'}),el('div',{text:'('+(name||'................................................')+')'}),el('div',{text:t1}),el('div',{text:'วันที่ ........./........./.........'})]); };
     return el('div',{class:'pdoc qf'},[
       el('div',{class:'qh'},[
@@ -526,7 +533,7 @@
   };
   function docDownload(id,kind,fmtx,btn,out){
     var label=btn.textContent; btn.disabled=true; btn.textContent='กำลังทำไฟล์…'; out.innerHTML='';
-    api('adminDoc',S.token,id,kind).then(function(d){ return docCanvas(d).then(function(c){
+    api('adminDoc',S.token,id,kind).then(function(d){ if(!d.phone){ (S.data.bookings||[]).forEach(function(x){ if(x.id===d.id) d.phone=x.phone; }); } return docCanvas(d).then(function(c){
       var name=(kind==='quote'?'ใบเสนอราคา_'+d.quoteNo:kind==='invoice'?'ใบแจ้งชำระ_'+d.invoiceNo:'ใบเสร็จ_'+d.receiptNo)+'_'+String((d.bill&&d.bill.name)||d.customer).replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,30);
       if(fmtx==='jpg') return new Promise(function(ok){ c.toBlob(ok,'image/jpeg',0.92); }).then(function(b){ return shareOrSave(b,name+'.jpg'); });
       return docLib('pdf').then(function(){ var pdf=new window.jspdf.jsPDF({unit:'mm',format:'a4'}), w=210, h=c.height*w/c.width; if(h>297){ w=w*297/h; h=297; }
