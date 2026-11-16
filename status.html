@@ -376,7 +376,7 @@ var bahtText=function(n){
     var tot=[['รวมเป็นเงิน',m2(base)]]; if(wht){ tot.push(['หักภาษี ณ ที่จ่าย '+wr+'%','− '+m2(wht)]); tot.push(['ยอดชำระสุทธิ',m2(base-wht)]); } else tot.push(['จำนวนเงินรวมทั้งสิ้น',m2(base)]);
     tot.forEach(function(r,i){ rows.push(el('tr',{class:'tot'+(i===tot.length-1?' grand':'')},[ i===0?el('td',{colspan:'4',rowspan:String(tot.length),class:'words'},[el('span',{text:'จำนวนเงิน (ตัวอักษร)'}),el('b',{text:bahtText(wht?base-wht:base)})]):null, el('td',{class:'r',text:r[0]}), el('td',{class:'r',text:r[1]}) ].filter(Boolean))); });
     sec.appendChild(el('div',{class:'qwrap'},[el('table',{class:'qi'},rows)]));
-    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'ชำระเต็มจำนวนหลังจบงาน',
+    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'เครดิต 30 วัน ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน',
       'ร้านกันคิวให้เมื่อยืนยันการจ้างแล้ว ('+(b.deposit?'ชำระมัดจำ หรือส่งใบสั่งจ้าง/ใบสั่งซื้อ':'ส่งใบสั่งจ้าง/ใบสั่งซื้อ หรือยืนยันเป็นลายลักษณ์อักษร')+')',
       s.vatNote||'', b.quoteTerms||'', b.docNote||'' ].filter(String);
     if(terms.length) sec.appendChild(el('div',{class:'qn'},[el('b',{text:'เงื่อนไขและหมายเหตุ'}),el('ol',{},terms.map(function(x){ return el('li',{text:x}); }))]));

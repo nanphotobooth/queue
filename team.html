@@ -443,7 +443,7 @@
   var telFmt=function(p){ p=String(p||'').replace(/\D/g,''); return p.length===10?p.slice(0,3)+'-'+p.slice(3,6)+'-'+p.slice(6):p.length===9?p.slice(0,2)+'-'+p.slice(2,5)+'-'+p.slice(5):p; };
   /* เงื่อนไขท้ายใบเสนอราคา: เฉพาะที่จำเป็น ไม่ซ้ำกับหัวเอกสาร (วันยืนราคาอยู่ที่หัวแล้ว) */
   var quoteTerms=function(d,money){ return [
-    d.deposit?'ชำระมัดจำ '+money(d.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'ชำระเต็มจำนวนหลังจบงาน',
+    d.deposit?'ชำระมัดจำ '+money(d.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'เครดิต 30 วัน ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน',
     'ร้านกันคิวให้เมื่อยืนยันการจ้างแล้ว ('+(d.deposit?'ชำระมัดจำ หรือส่งใบสั่งจ้าง/ใบสั่งซื้อ':'ส่งใบสั่งจ้าง/ใบสั่งซื้อ หรือยืนยันเป็นลายลักษณ์อักษร')+')',
     d.seller.vatNote||'', d.quoteTerms||'', d.docNote||'' ].filter(String); };
   function quoteNode(d){
@@ -972,9 +972,13 @@
     var wishes=el('input',{type:'checkbox'}); wishes.checked=!!b.wishes; if(ro) wishes.disabled=true; F.wishes=wishes;
     var note=el('textarea',ro?{disabled:true}:{}); note.value=b.note||''; F.note=note;
     var qline=el('div',{class:'quote'});
+    /* เลือกเก็บมัดจำหรือไม่ ไม่เก็บ = เครดิต 30 วัน ชำระเต็มหลังจบงาน (มัดจำ 0 และสถานะเงินตาม) */
+    var depMode=el('select',ro?{disabled:true}:{}); [['dep','เก็บมัดจำ'],['none','ไม่เก็บมัดจำ (เครดิต 30 วัน ชำระเต็มหลังจบงาน)']].forEach(function(o){ var op=el('option',{value:o[0],text:o[1]}); depMode.appendChild(op); });
+    depMode.value=(b.payStatus==='ไม่มัดจำ จ่ายเต็มหลังจบงาน'||(!isNew&&b.deposit!==''&&b.deposit!=null&&+b.deposit===0))?'none':'dep';
+    var noDep=function(){ return depMode.value==='none'; };
     var cur=function(){ var o={}; Object.keys(F).forEach(function(k){ o[k]=F[k].type==='checkbox'?F[k].checked:F[k].value; }); o.id=b.id; return o; };
     var showQuote=function(apply){ var q=quote(cur()); qline.innerHTML=''; if(!money) return; if(!q){ qline.textContent='ไม่มีราคาในตารางสำหรับจำนวนชั่วโมงนี้ กรอกราคาเอง'; return; }
-      if(apply){ ['price','travel','extra','total','deposit'].forEach(function(k){ F[k].value=q[k]; }); }
+      if(apply){ ['price','travel','extra','total','deposit'].forEach(function(k){ if(k==='deposit'&&noDep()) return; F[k].value=q[k]; }); }
       qline.appendChild(document.createTextNode('ราคาตามตาราง: รวม '+fmt(q.total)+' บาท · มัดจำ '+fmt(q.deposit)+' บาท '));
       if(!ro) qline.appendChild(el('button',{type:'button',text:'ใช้ราคานี้',onclick:function(){ showQuote(true); }})); };
     var backdropHint=el('div',{class:'quote'});
@@ -1007,9 +1011,13 @@
       qline,
       lab('ราคาแพ็กเกจ',inp('price','number',{inputmode:'numeric',min:0})), lab('ค่าเดินทาง',inp('travel','number',{inputmode:'numeric',min:0})),
       lab('ค่าเพิ่มอื่น',inp('extra','number',{inputmode:'numeric',min:0})), lab('ยอดรวม',inp('total','number',{inputmode:'numeric',min:0})),
+      lab('การชำระเงิน',depMode,true),
       lab('มัดจำ (แก้ได้)',inp('deposit','number',{inputmode:'numeric',min:0})), lab('สถานะเงิน',sel('payStatus',L.pay)) ]) ]));
+    var applyDep=function(){ if(ro) return; if(noDep()){ F.deposit.value=0; F.deposit.disabled=true; if(F.payStatus.value!=='ชำระครบ') F.payStatus.value='ไม่มัดจำ จ่ายเต็มหลังจบงาน'; }
+      else { F.deposit.disabled=false; if(+F.deposit.value===0){ var q=quote(cur()); if(q) F.deposit.value=q.deposit; } if(F.payStatus.value==='ไม่มัดจำ จ่ายเต็มหลังจบงาน') F.payStatus.value='ยังไม่มัดจำ'; } };
+    if(money){ depMode.onchange=applyDep; applyDep(); }
     var billAddr=el('textarea',ro?{disabled:true,rows:2}:{rows:2}); billAddr.value=b.billAddress||''; F.billAddress=billAddr;
-    var docNote=el('textarea',ro?{disabled:true,rows:2}:{rows:2,placeholder:'เช่น เครดิต 30 วัน · ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน'}); docNote.value=b.docNote||''; F.docNote=docNote;
+    var docNote=el('textarea',ro?{disabled:true,rows:2}:{rows:2,placeholder:'เงื่อนไขพิเศษของงานนี้ (ถ้ามี) เรื่องมัดจำ/เครดิตระบบใส่ให้เองตามที่เลือก'}); docNote.value=b.docNote||''; F.docNote=docNote;
     var wht=el('select',ro?{disabled:true}:{}); [['','ไม่หัก'],['1','1% ส่วนราชการ (จ่ายครั้งละ 10,000 บาทขึ้นไป)'],['3','3% บริษัท ห้างหุ้นส่วน (จ่ายครั้งละ 1,000 บาทขึ้นไป)']].forEach(function(o){ var op=el('option',{value:o[0],text:o[1]}); if(String(b.whtRate||'')===o[0]) op.selected=true; wht.appendChild(op); }); F.whtRate=wht;
     var hasBill=!!(b.billName||b.billTaxId||b.poNo||b.whtRate||b.docNote);
     var billFs=el('details',{class:'billfs'},[ el('summary',{text:'ออกเอกสารในนามหน่วยงาน / บริษัท'+(b.billName?' · '+b.billName:'')}), el('div',{class:'f'},[
