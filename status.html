@@ -376,7 +376,7 @@ var bahtText=function(n){
     var tot=[['รวมเป็นเงิน',m2(base)]]; if(wht){ tot.push(['หักภาษี ณ ที่จ่าย '+wr+'%','− '+m2(wht)]); tot.push(['ยอดชำระสุทธิ',m2(base-wht)]); } else tot.push(['จำนวนเงินรวมทั้งสิ้น',m2(base)]);
     tot.forEach(function(r,i){ rows.push(el('tr',{class:'tot'+(i===tot.length-1?' grand':'')},[ i===0?el('td',{colspan:'4',rowspan:String(tot.length),class:'words'},[el('span',{text:'จำนวนเงิน (ตัวอักษร)'}),el('b',{text:bahtText(wht?base-wht:base)})]):null, el('td',{class:'r',text:r[0]}), el('td',{class:'r',text:r[1]}) ].filter(Boolean))); });
     sec.appendChild(el('div',{class:'qwrap'},[el('table',{class:'qi'},rows)]));
-    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'เครดิต 30 วัน ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน',
+    var terms=[ b.deposit?'ชำระมัดจำ '+m2(b.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'เครดิต 7 วันหลังจบงาน ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน',
       'ร้านกันคิวให้เมื่อยืนยันการจ้างแล้ว ('+(b.deposit?'ชำระมัดจำ หรือส่งใบสั่งจ้าง/ใบสั่งซื้อ':'ส่งใบสั่งจ้าง/ใบสั่งซื้อ หรือยืนยันเป็นลายลักษณ์อักษร')+')',
       s.vatNote||'', b.quoteTerms||'', b.docNote||'' ].filter(String);
     if(terms.length) sec.appendChild(el('div',{class:'qn'},[el('b',{text:'เงื่อนไขและหมายเหตุ'}),el('ol',{},terms.map(function(x){ return el('li',{text:x}); }))]));
@@ -406,8 +406,10 @@ var bahtText=function(n){
       if(b.quoteTerms) sec.appendChild(el('p',{class:'dnote',text:'เงื่อนไข: '+b.quoteTerms})); }
     else if(kind==='invoice') sec.appendChild(kv([ b.payStatus==='มัดจำแล้ว'?['มัดจำที่ชำระแล้ว','− '+fmt(b.deposit)+' บาท']:null, ['ยอดคงเหลือ',fmt(b.due)+' บาท',wht?'':'total'], wht?['หักภาษี ณ ที่จ่าย '+wr+'%','− '+fmt(b.wht)+' บาท']:null, wht?['ยอดโอนสุทธิ',fmt(b.net)+' บาท','total']:null ]));
     else if(kind==='receipt') sec.appendChild(el('div',{class:'msg ok',text:'ได้รับชำระครบแล้ว '+fmt(b.grand)+' บาท'+(wht?' (รับเงินสุทธิ '+fmt(b.grand-wht)+' บาท หักภาษี ณ ที่จ่าย '+wr+'% '+fmt(wht)+' บาท)':'')+(b.paidAt?' เมื่อ '+short(b.paidAt.slice(0,10)):'')}));
+    else if(b.payStatus==='ไม่มัดจำ จ่ายเต็มหลังจบงาน') sec.appendChild(kv([['การชำระเงิน','ไม่เก็บมัดจำ เครดิต 7 วันหลังจบงาน'],['ยอดชำระหลังจบงาน',fmt(b.balance)+' บาท','total']]));
     else sec.appendChild(kv([['มัดจำที่ชำระแล้ว',fmt(b.deposit)+' บาท'],['ยอดคงเหลือ ชำระภายในวันถัดไปหลังจบงาน',fmt(b.balance)+' บาท','total']]));
     if(kind!=='booking'&&!isQuote) sec.appendChild(words);
+    if(kind==='invoice'&&b.payStatus==='ไม่มัดจำ จ่ายเต็มหลังจบงาน'&&b.finishedAt) sec.appendChild(el('p',{class:'dnote',text:'เครดิต 7 วันหลังจบงาน · ครบกำหนดชำระ '+short(addDays(String(b.finishedAt).slice(0,10),7))}));
     if(b.docNote) sec.appendChild(el('p',{class:'dnote',text:'หมายเหตุ: '+b.docNote}));
     if(b.seller.vatNote&&kind!=='booking') sec.appendChild(el('p',{class:'dnote',style:'color:var(--muted)',text:b.seller.vatNote}));
     if(org&&kind!=='booking') sec.appendChild(el('div',{class:'sign'},[ el('div',{},[el('div',{class:'ln',text:isQuote?'ผู้เสนอราคา':kind==='receipt'?'ผู้รับเงิน':'ผู้ส่งมอบงาน'}),el('div',{text:b.seller.signer?'('+b.seller.signer+')':'(................................................)'}),el('div',{text:'วันที่ ........./........./.........'})]),
@@ -419,6 +421,24 @@ var bahtText=function(n){
   }
 
   var wantQuote=qs('doc')==='quote';
+  /* ลูกค้ายืนยันจ้างตามใบเสนอราคา: จองได้ทุกวันที่ใบเสนอราคาระบุ (มีมัดจำ → ไปหน้าชำระมัดจำ · ไม่มีมัดจำ → รอทีมงานยืนยัน) */
+  function confirmQuote(b){
+    var sec=el('section',{class:'noprint'}), out=el('div');
+    var created=String(b.quoteAt||b.created||'').slice(0,10), until=/^\d{4}-\d{2}-\d{2}$/.test(created)?addDays(created,b.quoteDays):'', today=new Date((Date.parse(b.now)||Date.now())+7*3600000).toISOString().slice(0,10);
+    sec.appendChild(el('h2',{text:'ตกลงจ้างตามใบเสนอราคานี้'}));
+    if(until&&today>until){ sec.appendChild(el('div',{class:'msg warn',text:'ใบเสนอราคานี้หมดอายุแล้ว กรุณาทักแชทเพจเพื่อให้ทีมงานออกใบใหม่'})); if(b.messenger) sec.appendChild(el('a',{class:'btn primary',href:b.messenger,target:'_blank',rel:'noopener',text:'ทักแชทเพจ'})); return sec; }
+    sec.appendChild(el('p',{class:'sub',style:'margin:0 0 10px',text:+b.deposit>0?'กดยืนยันแล้วระบบจะกันคิวให้ '+(b.holdMinutes||15)+' นาที เพื่อโอนมัดจำ '+fmt(b.deposit)+' บาทและแนบสลิป':'ไม่เก็บมัดจำ เครดิต 7 วันหลังจบงาน กดยืนยันแล้วทีมงานจะตรวจคิวและยืนยันให้'}));
+    var terms=termsNode(false), ck=el('input',{type:'checkbox'});
+    sec.appendChild(terms); sec.appendChild(el('label',{class:'check',style:'margin-top:10px'},[ck,el('span',{style:'margin:0',text:'ฉันอ่านและยอมรับเงื่อนไขการจอง ยกเลิก และเลื่อนวัน'})]));
+    var go=el('button',{class:'btn primary',type:'button',text:'ยืนยันจ้างตามใบเสนอราคา'});
+    go.onclick=function(){ out.innerHTML=''; if(!ck.checked){ out.appendChild(el('div',{class:'msg bad',text:'กรุณาติ๊กยอมรับเงื่อนไขก่อน'})); return; }
+      go.disabled=true; go.textContent='กำลังยืนยัน…';
+      api('bookingFromQuote',b.id,auth.last4,true).then(function(r){ render(r,+r.deposit>0?'ยืนยันจ้างแล้ว กรุณาโอนมัดจำและแนบสลิปภายในเวลาที่กำหนด':'ยืนยันจ้างแล้ว ทีมงานจะตรวจคิวและยืนยันให้โดยเร็ว'); })
+        .catch(function(e){ go.disabled=false; go.textContent='ยืนยันจ้างตามใบเสนอราคา'; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+    sec.appendChild(out);
+    sec.appendChild(el('div',{class:'btns'},[go, b.messenger?el('a',{class:'btn',href:b.messenger,target:'_blank',rel:'noopener',text:'สอบถามทางแชทเพจ'}):null]));
+    return sec;
+  }
   function quoteView(b){
     clearInterval(timer); view.innerHTML='';
     view.appendChild(docBox(b,'quote'));
@@ -437,9 +457,7 @@ var bahtText=function(n){
     else if(s==='รอตรวจมัดจำ'){ head.appendChild(el('p',{text:'ได้รับสลิปแล้ว ทีมงานกำลังตรวจสอบ เมื่อยืนยันคิวแล้วจะส่งใบจองไปที่ '+b.email})); head.appendChild(summary(b)); head.appendChild(money(b)); }
     else if(s==='ใบเสนอราคา'){ view.appendChild(docBox(b,'quote'));
       var p=new URLSearchParams({date:b.date,slot:b.slot,service:b.service,print:b.print,hours:b.hours,area:b.area});
-      var chat=el('a',{class:'btn primary',href:b.messenger,target:'_blank',rel:'noopener',text:'ทักแชทเพจเพื่อยืนยันการจ้าง'}), bk=el('a',{class:'btn',href:'book.html?'+p.toString(),text:'จองคิวออนไลน์ตามใบเสนอราคานี้'});
-      view.appendChild(el('section',{class:'noprint'},[ el('div',{class:'btns'},!b.messenger?[(bk.className='btn primary',bk)]:(b.bill&&b.bill.name)?[chat,bk]:[(bk.className='btn primary',bk),(chat.className='btn',chat)]),
-        el('p',{class:'hint',style:'margin:8px 0 0',text:'แจ้งเลขที่ '+(b.quoteNo||b.id)+' กับทีมงาน · จองออนไลน์ได้เฉพาะวันที่เปิดจอง ระบบจะเช็กคิวว่างอีกครั้งตอนจอง'}) ])); }
+      view.appendChild(confirmQuote(b)); }
     else if(s==='จบงาน รอชำระ'){ view.appendChild(balanceBox(b)); var fb=filesBox(b); if(fb) view.appendChild(fb); view.appendChild(docBox(b,'invoice')); }
     else if(s==='รอตรวจยอดคงเหลือ'){ head.appendChild(el('p',{text:'ได้รับสลิปยอดคงเหลือแล้ว ทีมงานกำลังตรวจสอบ และจะส่งใบเสร็จไปที่ '+b.email})); var fb2=filesBox(b); if(fb2) view.appendChild(fb2); view.appendChild(docBox(b,'invoice')); }
     else if(s==='ปิดงาน'){ head.appendChild(el('p',{text:'ขอบคุณที่ใช้บริการ Nan Photo Booth ค่ะ'})); var fb3=filesBox(b); if(fb3) view.appendChild(fb3); view.appendChild(docBox(b,'receipt')); }

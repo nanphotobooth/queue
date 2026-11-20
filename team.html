@@ -311,6 +311,25 @@
   /* ---------- blocked dates ---------- */
   function blocksView(app){
     var d=S.data;
+    if(can('block')&&d.online){
+      var on=d.online, DN=['อา','จ','อ','พ','พฤ','ศ','ส'], open=on.open.slice(), out1=el('div'), list=el('div');
+      var cks=DN.map(function(n,i){ var c=el('input',{type:'checkbox'}); c.checked=on.days.indexOf(i)>=0; return el('label',{class:'check',style:'display:inline-flex;margin-right:12px'},[c,n]); });
+      var od=el('input',{type:'date',min:d.today,'aria-label':'วันที่เปิดจองพิเศษ'});
+      var drawOpen=function(){ list.innerHTML=''; if(!open.length){ list.appendChild(el('div',{class:'quote',text:'ยังไม่มีวันที่เปิดพิเศษ'})); return; }
+        open.forEach(function(x,i){ list.appendChild(el('div',{class:'blockrow'},[ el('b',{text:thDate(x)}), el('button',{type:'button',text:'ลบ',onclick:function(){ open.splice(i,1); drawOpen(); }}) ])); }); };
+      var addB=el('button',{class:'btn',type:'button',text:'เพิ่มวันนี้',onclick:function(){ if(od.value&&open.indexOf(od.value)<0){ open.push(od.value); open.sort(); drawOpen(); } od.value=''; }});
+      var saveB=el('button',{class:'btn primary',type:'button',text:'บันทึกวันเปิดจอง'});
+      saveB.onclick=function(){ saveB.disabled=true; out1.innerHTML=''; var days=[]; cks.forEach(function(l,i){ if(l.firstChild.checked) days.push(i); });
+        api('adminOnline',S.token,{days:days,open:open}).then(function(r){ saveB.disabled=false; d.online=r; open=r.open.slice(); drawOpen(); out1.appendChild(el('div',{class:'msg ok',text:'บันทึกแล้ว หน้าเว็บลูกค้าอัปเดตภายในไม่กี่นาที'})); })
+          .catch(function(e){ saveB.disabled=false; out1.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+      drawOpen();
+      app.appendChild(el('fieldset',{style:'margin-top:14px'},[ el('legend',{text:'วันที่ลูกค้าจองออนไลน์ได้'}),
+        el('p',{class:'quote',style:'margin:0 0 6px',text:'วันที่ไม่ได้ติ๊ก หน้าเว็บจะให้ลูกค้าทักแชทเพจหรือขอใบเสนอราคา · ทีมงานลงคิววันไหนก็ได้เสมอ · ลูกค้าที่ได้ใบเสนอราคาแล้วกดยืนยันจ้างได้ทุกวัน'}),
+        el('div',{},cks),
+        el('p',{class:'quote',style:'margin:10px 0 4px',text:'เปิดจองออนไลน์เป็นพิเศษเฉพาะวัน (เช่น วันธรรมดาที่ทีมว่าง)'}),
+        el('div',{class:'f'},[ el('label',{},[el('span',{text:'วันที่'}),od]), el('div',{style:'align-self:end'},[addB]) ]), list,
+        el('div',{class:'actions'},[el('span'),saveB]), out1 ]));
+    }
     if(can('block')){
       var date=el('input',{type:'date',min:d.today,'aria-label':'วันที่ปิดรับงาน'}), slot=el('select',{'aria-label':'รอบ'}), reason=el('input',{type:'text',placeholder:'เหตุผล เช่น ซ่อมอุปกรณ์','aria-label':'เหตุผล'}), out=el('div');
       ['ทั้งวัน','เช้า','เย็น'].forEach(function(s){ slot.appendChild(el('option',{text:s})); });
@@ -443,7 +462,7 @@
   var telFmt=function(p){ p=String(p||'').replace(/\D/g,''); return p.length===10?p.slice(0,3)+'-'+p.slice(3,6)+'-'+p.slice(6):p.length===9?p.slice(0,2)+'-'+p.slice(2,5)+'-'+p.slice(5):p; };
   /* เงื่อนไขท้ายใบเสนอราคา: เฉพาะที่จำเป็น ไม่ซ้ำกับหัวเอกสาร (วันยืนราคาอยู่ที่หัวแล้ว) */
   var quoteTerms=function(d,money){ return [
-    d.deposit?'ชำระมัดจำ '+money(d.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'เครดิต 30 วัน ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน',
+    d.deposit?'ชำระมัดจำ '+money(d.deposit)+' บาท เมื่อยืนยันการจ้าง ส่วนที่เหลือชำระหลังจบงาน':'เครดิต 7 วันหลังจบงาน ไม่เก็บมัดจำ ชำระเต็มหลังจบงาน',
     'ร้านกันคิวให้เมื่อยืนยันการจ้างแล้ว ('+(d.deposit?'ชำระมัดจำ หรือส่งใบสั่งจ้าง/ใบสั่งซื้อ':'ส่งใบสั่งจ้าง/ใบสั่งซื้อ หรือยืนยันเป็นลายลักษณ์อักษร')+')',
     d.seller.vatNote||'', d.quoteTerms||'', d.docNote||'' ].filter(String); };
   function quoteNode(d){
@@ -507,6 +526,7 @@
         d.pay.bankName||d.pay.bankAccountName?el('p',{text:[d.pay.bankName,d.pay.bankAccountName,d.pay.bankAccount?'เลขที่ '+d.pay.bankAccount:''].filter(String).join(' · ')}):null,
         el('p',{class:'mut',text:'โอนแล้วส่งสลิปในแชทเพจ หรือแนบสลิปที่ '+String(d.siteUrl||'').replace(/^https?:\/\//,'')+'status.html (เลขที่การจอง '+d.id+' + เบอร์โทร 4 ตัวท้าย)'}) ]) ])); }
     else if(rc) n.appendChild(el('div',{class:'paid'},[ el('b',{text:'ได้รับชำระเงินครบแล้ว'}), el('span',{text:baht(wht?d.grand-wht:d.grand)+(d.paidAt?' · '+thFull(d.paidAt):'')}) ]));
+    if(inv&&d.payStatus==='ไม่มัดจำ จ่ายเต็มหลังจบงาน'&&d.finishedAt){ var fp=String(d.finishedAt).slice(0,10).split('-'), dueD=new Date(Date.UTC(+fp[0],+fp[1]-1,+fp[2]+7)).toISOString().slice(0,10); n.appendChild(el('p',{class:'dnote',text:'เครดิต 7 วันหลังจบงาน · ครบกำหนดชำระ '+thFull(dueD)})); }
     if(d.docNote) n.appendChild(el('p',{class:'dnote',text:'หมายเหตุ: '+d.docNote}));
     if(d.seller.vatNote) n.appendChild(el('p',{class:'mut',text:d.seller.vatNote}));
     if(!qt&&d.fileLink) n.appendChild(el('p',{class:'mut',text:'ลิงก์ไฟล์งาน: '+d.fileLink}));
@@ -561,7 +581,15 @@
         .catch(function(e){ mb.disabled=false; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
     var full=el('fieldset',{},[ el('legend',{text:'ใบเสนอราคา'+(b.quoteNo?' '+b.quoteNo:'')}),
       el('p',{style:'margin:0 0 8px;font-size:14px',text:(b.quoteNo?'':'ระบบออกเลขที่ใบเสนอราคาให้เมื่อดาวน์โหลดหรือส่งครั้งแรก · ')+'ใช้ราคาและข้อมูลที่บันทึกไว้ ถ้าแก้ข้อมูลด้านล่าง กดบันทึกก่อน · ออกในนามหน่วยงานได้ที่ช่อง "ออกเอกสารในนามหน่วยงาน"'}),
-      el('div',{class:'actions'},[bt('pdf','PDF'),bt('jpg','JPEG (รูปภาพ)'),mb]), out ]);
+      el('div',{class:'actions'},[bt('pdf','PDF'),bt('jpg','JPEG (รูปภาพ)'),mb]),
+      b.status==='ใบเสนอราคา'&&can('edit')?el('div',{style:'margin-top:10px;border-top:1px solid var(--line);padding-top:10px'},[
+        el('p',{style:'margin:0 0 8px;font-size:14px',text:'ลูกค้าตกลงจ้างแล้ว: กดลงคิวได้เลย ระบบเช็กคิวชนให้ ลงได้ทุกวันรวมวันธรรมดา (ลูกค้ากดยืนยันเองจากลิงก์ใบเสนอราคาก็ได้)'}),
+        el('button',{class:'btn primary',type:'button',text:'ลูกค้าตกลงจ้าง → ลงคิว',onclick:function(){ var x=this;
+          if(!confirm('ลงคิว '+thDate(b.date)+' รอบ'+b.slot+' ให้ '+(b.billName||b.customer)+' ใช่ไหม\n'+(+b.deposit>0?'มัดจำ '+fmt(b.deposit)+' บาท (สถานะเงิน: ยังไม่มัดจำ)':'ไม่เก็บมัดจำ เครดิต 7 วันหลังจบงาน'))) return;
+          x.disabled=true; out.innerHTML='';
+          api('adminSave',S.token,{id:b.id,status:'ยืนยันคิว',payStatus:+b.deposit>0?(b.payStatus||'ยังไม่มัดจำ'):'ไม่มัดจำ จ่ายเต็มหลังจบงาน'}).then(function(r){ $('dlg').close(); refresh('ลงคิว '+r.id+' แล้ว · ใบเสนอราคา '+(b.quoteNo||b.id)+' ผูกกับคิวนี้'); })
+            .catch(function(e){ x.disabled=false; out.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); }}) ]):null,
+      out ]);
     // ลูกค้าส่วนใหญ่ไม่ต้องการใบเสนอราคา: แสดงเต็มเฉพาะคิวที่เป็นใบเสนอราคา เคยออกแล้ว หรือออกในนามหน่วยงาน ที่เหลือเป็นปุ่มเล็กให้กดเปิดเมื่อลูกค้าขอ
     if(b.quoteNo||b.status==='ใบเสนอราคา'||b.billName) return full;
     var wrap=el('div',{style:'margin:0 0 12px'}), open=el('button',{class:'btn',type:'button',text:'ออกใบเสนอราคา (เมื่อลูกค้าขอ)'});
@@ -972,8 +1000,8 @@
     var wishes=el('input',{type:'checkbox'}); wishes.checked=!!b.wishes; if(ro) wishes.disabled=true; F.wishes=wishes;
     var note=el('textarea',ro?{disabled:true}:{}); note.value=b.note||''; F.note=note;
     var qline=el('div',{class:'quote'});
-    /* เลือกเก็บมัดจำหรือไม่ ไม่เก็บ = เครดิต 30 วัน ชำระเต็มหลังจบงาน (มัดจำ 0 และสถานะเงินตาม) */
-    var depMode=el('select',ro?{disabled:true}:{}); [['dep','เก็บมัดจำ'],['none','ไม่เก็บมัดจำ (เครดิต 30 วัน ชำระเต็มหลังจบงาน)']].forEach(function(o){ var op=el('option',{value:o[0],text:o[1]}); depMode.appendChild(op); });
+    /* เลือกเก็บมัดจำหรือไม่ ไม่เก็บ = เครดิต 7 วัน ชำระเต็มหลังจบงาน (มัดจำ 0 และสถานะเงินตาม) */
+    var depMode=el('select',ro?{disabled:true}:{}); [['dep','เก็บมัดจำ'],['none','ไม่เก็บมัดจำ (เครดิต 7 วันหลังจบงาน ชำระเต็ม)']].forEach(function(o){ var op=el('option',{value:o[0],text:o[1]}); depMode.appendChild(op); });
     depMode.value=(b.payStatus==='ไม่มัดจำ จ่ายเต็มหลังจบงาน'||(!isNew&&b.deposit!==''&&b.deposit!=null&&+b.deposit===0))?'none':'dep';
     var noDep=function(){ return depMode.value==='none'; };
     var cur=function(){ var o={}; Object.keys(F).forEach(function(k){ o[k]=F[k].type==='checkbox'?F[k].checked:F[k].value; }); o.id=b.id; return o; };
