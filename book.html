@@ -269,11 +269,14 @@ var bahtText=function(n){
     var drawPb=function(){
       pbBox.innerHTML='';
       if(hasPb()){
-        var opts=[['ครีม','ครีม'],['เทาเข้ม','เทาเข้ม']]; if(F.hours>=4) opts.push(['อื่นๆ','ระบุสีฉากหรือฉากพิเศษเอง']); else if(F.backdrop==='อื่นๆ') F.backdrop='';
+        var BD=init.backdrops||{std:['เทาเข้ม','เทาอ่อน','ครีม'],full:[],fullHours:4}, isFull=F.hours>=BD.fullHours;
+        var opts=BD.std.map(function(x){ return [x,x]; });
+        if(isFull){ BD.full.forEach(function(x){ opts.push([x,x+' (เหมาคิว)']); }); opts.push(['อื่นๆ','ฉากอื่น ระบุเอง (ร้านจัดหาให้)']); }
+        else if(F.backdrop&&BD.std.indexOf(F.backdrop)<0) F.backdrop='';
         opts.unshift(['','เลือกฉาก']);
         var other=el('div'); var drawOther=function(){ other.innerHTML=''; if(F.backdrop==='อื่นๆ') other.appendChild(field('ฉากที่ต้องการ',input('backdropOther','text',{placeholder:'เช่น ฉากสีชมพูพาสเทล',maxlength:200}),true,'ฉากพิเศษรวมในแพ็กเกจเมื่อมูลค่าไม่เกิน 3,000 บาท ถ้าเกิน แอดมินจะติดต่อแจ้งส่วนต่าง')); };
         pbBox.appendChild(el('div',{class:'row'},[ field('รูปแบบภาพ',select('print',[['2x6','พิมพ์ 2x6 นิ้ว'],['4x6','พิมพ์ 4x6 นิ้ว'],['ไม่พิมพ์','ไม่พิมพ์ภาพ (รับไฟล์)']],drawQuote),true), field('ฉาก',select('backdrop',opts,drawOther),true) ]));
-        pbBox.appendChild(el('div',{class:'hint',text:F.hours>=4?'แพ็กเกจ 4 ชั่วโมงขึ้นไป ระบุสีฉากหรือฉากพิเศษเองได้':'แพ็กเกจ 2–3 ชั่วโมง เลือกฉากได้ ครีม หรือ เทาเข้ม'}));
+        pbBox.appendChild(el('div',{class:'hint',text:isFull?'เหมาคิว '+BD.fullHours+' ชั่วโมงขึ้นไป เลือกฉากได้มากกว่า '+BD.std.length+' สีที่มี หรือระบุฉากที่ต้องการเอง ร้านจัดหาให้':'แพ็กเกจต่ำกว่า '+BD.fullHours+' ชั่วโมง เลือกฉากได้ '+BD.std.length+' แบบ: '+BD.std.join(' / ')+' · เหมาคิว '+BD.fullHours+' ชั่วโมงขึ้นไป เลือกฉากอื่นได้'}));
         pbBox.appendChild(other); drawOther();
         pbBox.appendChild(check('wishes','เพิ่มเขียนคำอวยพรขนาด 2x6 นิ้ว (+'+fmt(init.fees.wishesFee)+' บาท แถมอัลบั้มใส่ภาพ)',drawQuote));
       }

@@ -272,7 +272,7 @@
       el('div',{class:'stat'},[el('b',{text:review.length}),el('span',{text:'สลิปรอตรวจ'})]) ]));
     var tabs=el('div',{class:'tabs',style:'margin-top:12px'});
     if(!can('review')&&S.tab==='review') S.tab='up';
-    [can('review')?['review','ตรวจสลิป'+(review.length?' ('+review.length+')':'')]:null,(can('finish')||can('settle'))?['close','ปิดงาน/รับเงิน'+(close.length?' ('+close.length+')':'')]:null,['up','คิวล่วงหน้า'],['need','ข้อมูลไม่ครบ'+(need.length?' ('+need.length+')':'')],['quote','ใบเสนอราคา'+(quotesNew.length?' ('+quotesNew.length+')':'')],['past','ที่ผ่านมา'],can('ledger')?['ledger','บัญชี']:null,can('report')?['report','รายงาน']:null,['block','ปิดวัน'],can('users')?['team','ทีมงาน']:null].filter(Boolean).forEach(function(t){ tabs.appendChild(el('button',{class:S.tab===t[0]?'on':'',text:t[1],onclick:function(){ S.tab=t[0]; main(); }})); });
+    [can('review')?['review','ตรวจสลิป'+(review.length?' ('+review.length+')':'')]:null,(can('finish')||can('settle'))?['close','ปิดงาน/รับเงิน'+(close.length?' ('+close.length+')':'')]:null,['up','คิวล่วงหน้า'],['need','ข้อมูลไม่ครบ'+(need.length?' ('+need.length+')':'')],['quote','ใบเสนอราคา'+(quotesNew.length?' ('+quotesNew.length+')':'')],['past','ที่ผ่านมา'],can('ledger')?['ledger','บัญชี']:null,can('report')?['report','รายงาน']:null,['block','ปิดวัน/ฉาก'],can('users')?['team','ทีมงาน']:null].filter(Boolean).forEach(function(t){ tabs.appendChild(el('button',{class:S.tab===t[0]?'on':'',text:t[1],onclick:function(){ S.tab=t[0]; main(); }})); });
     app.appendChild(tabs);
     if(S.tab==='block'){ blocksView(app); }
     else if(S.tab==='ledger'){ ledgerView(app); }
@@ -329,6 +329,29 @@
         el('p',{class:'quote',style:'margin:10px 0 4px',text:'เปิดจองออนไลน์เป็นพิเศษเฉพาะวัน (เช่น วันธรรมดาที่ทีมว่าง)'}),
         el('div',{class:'f'},[ el('label',{},[el('span',{text:'วันที่'}),od]), el('div',{style:'align-self:end'},[addB]) ]), list,
         el('div',{class:'actions'},[el('span'),saveB]), out1 ]));
+    }
+    if(can('block')&&d.backdrops){
+      var bdS=d.backdrops.std.slice(), bdF=d.backdrops.full.slice(), bdBox=el('div'), outB=el('div');
+      var fhSel=el('select',{'aria-label':'เหมาคิวกี่ชั่วโมงขึ้นไป'}); [2,3,4,5,6].forEach(function(h){ var o=el('option',{value:String(h),text:h+' ชั่วโมงขึ้นไป'}); if(h===d.backdrops.fullHours) o.selected=true; fhSel.appendChild(o); });
+      var drawBd=function(){ bdBox.innerHTML='';
+        [['std',bdS,'ฉากมาตรฐาน (เลือกได้ทุกแพ็กเกจ)'],['full',bdF,'ฉากเพิ่มเติม (เฉพาะลูกค้าเหมาคิว)']].forEach(function(g){
+          var arr=g[1]; bdBox.appendChild(el('p',{class:'quote',style:'margin:10px 0 4px;font-weight:600',text:g[2]}));
+          if(!arr.length) bdBox.appendChild(el('div',{class:'quote',text:g[0]==='full'?'ยังไม่มี · ลูกค้าเหมาคิวยังระบุฉากที่ต้องการเองได้':'ยังไม่มี'}));
+          arr.forEach(function(x,i){ var nm=el('input',{type:'text',value:x,maxlength:60,'aria-label':'ชื่อฉาก'}); nm.oninput=function(){ arr[i]=nm.value; };
+            bdBox.appendChild(el('div',{class:'blockrow'},[ nm, el('div',{},[
+              el('button',{type:'button',text:g[0]==='std'?'ย้ายไปเหมาคิว':'ย้ายไปมาตรฐาน',onclick:function(){ var v=arr.splice(i,1)[0]; (g[0]==='std'?bdF:bdS).push(v); drawBd(); }}),
+              el('button',{type:'button',text:'ลบ',onclick:function(){ arr.splice(i,1); drawBd(); }}) ]) ])); });
+          var ni=el('input',{type:'text',maxlength:60,placeholder:'ชื่อฉากใหม่ เช่น ชมพูพาสเทล','aria-label':'ชื่อฉากใหม่'});
+          bdBox.appendChild(el('div',{class:'f'},[ el('label',{},[el('span',{text:'เพิ่มฉาก'}),ni]), el('div',{style:'align-self:end'},[ el('button',{class:'btn',type:'button',text:'เพิ่ม',onclick:function(){ var v=ni.value.trim(); if(v&&bdS.indexOf(v)<0&&bdF.indexOf(v)<0){ arr.push(v); drawBd(); } }}) ]) ])); }); };
+      var saveBd=el('button',{class:'btn primary',type:'button',text:'บันทึกฉาก'});
+      saveBd.onclick=function(){ saveBd.disabled=true; outB.innerHTML='';
+        api('adminBackdrops',S.token,{std:bdS.map(function(x){ return x.trim(); }),full:bdF.map(function(x){ return x.trim(); }),fullHours:+fhSel.value}).then(function(r){ saveBd.disabled=false; d.backdrops=r; bdS=r.std.slice(); bdF=r.full.slice(); drawBd(); outB.appendChild(el('div',{class:'msg ok',text:'บันทึกแล้ว หน้าจองของลูกค้าอัปเดตภายในไม่กี่นาที'})); })
+          .catch(function(e){ saveBd.disabled=false; outB.appendChild(el('div',{class:'msg bad',text:errText(e)})); }); };
+      drawBd();
+      app.appendChild(el('fieldset',{style:'margin-top:14px'},[ el('legend',{text:'ฉาก'}),
+        el('p',{class:'quote',style:'margin:0 0 6px',text:'ลูกค้าจองต่ำกว่าจำนวนชั่วโมงเหมาคิว เลือกได้เฉพาะฉากมาตรฐาน · ลูกค้าเหมาคิวเลือกได้ทุกฉาก หรือระบุฉากที่ต้องการเอง ร้านจัดหาให้'}),
+        el('div',{class:'f'},[ el('label',{},[el('span',{text:'นับเป็นเหมาคิวเมื่อจอง'}),fhSel]) ]), bdBox,
+        el('div',{class:'actions'},[el('span'),saveBd]), outB ]));
     }
     if(can('block')){
       var date=el('input',{type:'date',min:d.today,'aria-label':'วันที่ปิดรับงาน'}), slot=el('select',{'aria-label':'รอบ'}), reason=el('input',{type:'text',placeholder:'เหตุผล เช่น ซ่อมอุปกรณ์','aria-label':'เหตุผล'}), out=el('div');
@@ -1010,7 +1033,8 @@
       qline.appendChild(document.createTextNode('ราคาตามตาราง: รวม '+fmt(q.total)+' บาท · มัดจำ '+fmt(q.deposit)+' บาท '));
       if(!ro) qline.appendChild(el('button',{type:'button',text:'ใช้ราคานี้',onclick:function(){ showQuote(true); }})); };
     var backdropHint=el('div',{class:'quote'});
-    var hint=function(){ backdropHint.textContent = F.service.value==='Video Guestbook' ? '' : (+F.hours.value>=4 ? 'จอง 4 ชั่วโมงขึ้นไป ระบุสีฉากหรือฉากพิเศษได้ (มูลค่าไม่เกิน 3,000 บาท)' : 'จอง 2–3 ชั่วโมง เลือกได้ ครีม หรือ เทาเข้ม'); };
+    var BD=(S.data&&S.data.backdrops)||{std:['เทาเข้ม','เทาอ่อน','ครีม'],full:[],fullHours:4};
+    var hint=function(){ backdropHint.textContent = F.service.value==='Video Guestbook' ? '' : (+F.hours.value>=BD.fullHours ? 'เหมาคิว '+BD.fullHours+' ชั่วโมงขึ้นไป เลือกฉากอื่นหรือฉากที่ลูกค้าต้องการได้ ร้านจัดหาให้ (มูลค่าไม่เกิน 3,000 บาท)' : 'จองต่ำกว่า '+BD.fullHours+' ชั่วโมง เลือกได้ '+BD.std.join(' / ')); };
 
     sheet.appendChild(el('div',{class:'bar'},[ el('h1',{text:isNew?'เพิ่มคิว':(b.id||'คิวงาน')}), el('button',{class:'btn',type:'button',text:'ปิด',onclick:function(){ $('dlg').close(); }}) ]));
     if(!isNew&&b.status==='รอตรวจมัดจำ') sheet.appendChild(reviewBox(b));
@@ -1026,9 +1050,9 @@
       lab('เวลาเริ่ม',inp('start','time')), lab('เวลาสิ้นสุด',inp('end','time')),
       lab('บริการ',sel('service',L.services),true),
       lab('ชั่วโมง',sel('hours',[2,3,4,5,6,7,8])), lab('รูปแบบภาพ',sel('print',['2x6','4x6','ไม่พิมพ์','-'])),
-      lab('ฉาก',inp('backdrop','text',{list:'bd',placeholder:'ครีม / เทาเข้ม'})), el('label',{class:'check'},[wishes,'เขียนคำอวยพร 2x6']),
+      lab('ฉาก',inp('backdrop','text',{list:'bd',placeholder:BD.std.join(' / ')})), el('label',{class:'check'},[wishes,'เขียนคำอวยพร 2x6']),
       backdropHint ]) ]));
-    sheet.appendChild(el('datalist',{id:'bd'},[el('option',{value:'ครีม'}),el('option',{value:'เทาเข้ม'})]));
+    sheet.appendChild(el('datalist',{id:'bd'},BD.std.concat(BD.full).map(function(x){ return el('option',{value:x}); })));
     sheet.appendChild(el('fieldset',{},[ el('legend',{text:'ลูกค้าและสถานที่'}), el('div',{class:'f'},[
       lab('ชื่อลูกค้า',inp('customer','text',{autocomplete:'off'}),true),
       lab('เบอร์โทร',inp('phone','tel',{inputmode:'tel'})), lab('Facebook / LINE',inp('contact')),
